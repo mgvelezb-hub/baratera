@@ -13,8 +13,8 @@ import { calcularSemaforo } from '@/lib/types'
 // ── Types ──────────────────────────────────────────────────────
 interface CartItem {
   producto: Producto
-  cantidad: number
-  modoCaja: boolean   // true = selling boxes, false = pieces
+  cantidadCajas: number
+  cantidadPiezas: number
 }
 
 interface VentaExitosa {
@@ -23,31 +23,37 @@ interface VentaExitosa {
   hora: string
 }
 
-// ── Price / stock helpers ──────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────
 function piezasReales(item: CartItem): number {
-  if (item.modoCaja && item.producto.piezas_por_caja) {
-    return item.cantidad * item.producto.piezas_por_caja
-  }
-  return item.cantidad
-}
-
-function precioItem(item: CartItem): number {
-  if (item.modoCaja && item.producto.precio_caja) {
-    return Number(item.producto.precio_caja)
-  }
-  const p = item.producto
-  if (p.precio_mayoreo && p.umbral_mayoreo && item.cantidad >= p.umbral_mayoreo) {
-    return Number(p.precio_mayoreo)
-  }
-  return Number(p.precio_menudeo)
+  return item.cantidadCajas * (item.producto.piezas_por_caja ?? 0) + item.cantidadPiezas
 }
 
 function subtotalItem(item: CartItem): number {
-  return precioItem(item) * item.cantidad
+  let total = 0
+  const p = item.producto
+
+  if (item.cantidadCajas > 0 && p.precio_caja) {
+    total += item.cantidadCajas * Number(p.precio_caja)
+  }
+  if (item.cantidadPiezas > 0) {
+    const esMayoreo = item.cantidadCajas === 0 &&
+      p.precio_mayoreo && p.umbral_mayoreo &&
+      item.cantidadPiezas >= p.umbral_mayoreo
+    total += item.cantidadPiezas * (esMayoreo ? Number(p.precio_mayoreo) : Number(p.precio_menudeo))
+  }
+  return total
 }
 
 function totalCarrito(items: CartItem[]): number {
   return items.reduce((acc, i) => acc + subtotalItem(i), 0)
+}
+
+function maxCajas(p: Producto): number {
+  return p.piezas_por_caja ? Math.floor(p.stock_fisico / p.piezas_por_caja) : 0
+}
+
+function maxPiezas(item: CartItem): number {
+  return item.producto.stock_fisico - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
 }
 
 // ── Product card ───────────────────────────────────────────────
@@ -60,18 +66,11 @@ function ProductoCardPOS({
   itemEnCarrito: CartItem | undefined
   onAgregar: () => void
 }) {
-  const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
-  const sinStock = producto.stock_fisico <= 0
-  const cantidad = itemEnCarrito?.cantidad ?? 0
-  const esMayoreo = !itemEnCarrito?.modoCaja &&
-    cantidad > 0 &&
-    producto.precio_mayoreo && producto.umbral_mayoreo &&
-    cantidad >= producto.umbral_mayoreo
+  const semaforo  = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
+  const sinStock  = producto.stock_fisico <= 0
+  const enCarrito = itemEnCarrito ? piezasReales(itemEnCarrito) > 0 : false
   const tieneCaja = !!(producto.precio_caja && producto.piezas_por_caja)
-
-  const precioMostrado = itemEnCarrito
-    ? precioItem(itemEnCarrito)
-    : Number(producto.precio_menudeo)
+  const totalPzs  = itemEnCarrito ? piezasReales(itemEnCarrito) : 0
 
   return (
     <button
@@ -81,7 +80,7 @@ function ProductoCardPOS({
         w-full text-left p-3 rounded-xl border transition-all
         ${sinStock
           ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
-          : cantidad > 0
+          : enCarrito
             ? 'bg-violet-50 border-violet-300 shadow-sm'
             : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-sm active:scale-[0.98]'
         }
@@ -91,21 +90,21 @@ function ProductoCardPOS({
         <p className="text-sm font-semibold text-slate-900 leading-tight line-clamp-2 flex-1">
           {producto.nombre}
         </p>
-        {cantidad > 0 && (
+        {enCarrito && (
           <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
-            {cantidad}
+            {totalPzs}
           </span>
         )}
       </div>
 
       <div className="flex items-end justify-between gap-1">
         <div>
-          <p className={`text-base font-bold ${esMayoreo ? 'text-green-700' : 'text-slate-900'}`}>
-            {formatMXN(precioMostrado)}
+          <p className="text-base font-bold text-slate-900">
+            {formatMXN(Number(producto.precio_menudeo))}
           </p>
           <div className="flex gap-1.5 mt-0.5">
-            {esMayoreo && (
-              <span className="text-xs text-green-600 font-medium">Mayoreo ✓</span>
+            {producto.precio_mayoreo && (
+              <span className="text-xs text-green-600 font-medium">Mayoreo disp.</span>
             )}
             {tieneCaja && (
               <span className="text-xs text-amber-600 font-medium">Caja disp.</span>
@@ -127,94 +126,131 @@ function ProductoCardPOS({
 // ── Cart item row ──────────────────────────────────────────────
 function CartItemRow({
   item,
-  onCambiarCantidad,
-  onCambiarModo,
+  onCambiarCajas,
+  onCambiarPiezas,
   onEliminar,
 }: {
   item: CartItem
-  onCambiarCantidad: (id: string, delta: number) => void
-  onCambiarModo: (id: string, modoCaja: boolean) => void
+  onCambiarCajas: (id: string, delta: number) => void
+  onCambiarPiezas: (id: string, delta: number) => void
   onEliminar: (id: string) => void
 }) {
-  const precio       = precioItem(item)
-  const tieneCaja    = !!(item.producto.precio_caja && item.producto.piezas_por_caja)
-  const esMayoreo    = !item.modoCaja &&
-    item.producto.precio_mayoreo && item.producto.umbral_mayoreo &&
-    item.cantidad >= item.producto.umbral_mayoreo
-
-  const unidadLabel  = item.modoCaja ? 'caja' : item.producto.unidad
-  const maxCantidad  = item.modoCaja && item.producto.piezas_por_caja
-    ? Math.floor(item.producto.stock_fisico / item.producto.piezas_por_caja)
-    : item.producto.stock_fisico
+  const p         = item.producto
+  const tieneCaja = !!(p.precio_caja && p.piezas_por_caja)
+  const esMayoreo = !tieneCaja && item.cantidadCajas === 0 &&
+    p.precio_mayoreo && p.umbral_mayoreo &&
+    item.cantidadPiezas >= p.umbral_mayoreo
 
   return (
     <li className="py-3">
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-sm font-semibold text-slate-900 leading-tight flex-1 line-clamp-2">
-          {item.producto.nombre}
+          {p.nombre}
         </p>
         <button
-          onClick={() => onEliminar(item.producto.id)}
+          onClick={() => onEliminar(p.id)}
           className="shrink-0 p-1 rounded hover:bg-slate-100 text-slate-400"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Pza / Caja toggle */}
-      {tieneCaja && (
-        <div className="flex gap-1 mb-2">
-          <button
-            onClick={() => onCambiarModo(item.producto.id, false)}
-            className={`flex-1 h-7 rounded-lg text-xs font-semibold transition-colors ${
-              !item.modoCaja
-                ? 'bg-violet-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Por pieza
-          </button>
-          <button
-            onClick={() => onCambiarModo(item.producto.id, true)}
-            className={`flex-1 h-7 rounded-lg text-xs font-semibold transition-colors ${
-              item.modoCaja
-                ? 'bg-amber-500 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Por caja
-          </button>
+      {tieneCaja ? (
+        /* ── Product with box pricing: two independent steppers ── */
+        <div className="space-y-1.5">
+          {/* Cajas row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onCambiarCajas(p.id, -1)}
+                className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 flex items-center justify-center transition-colors"
+              >
+                <Minus className="w-3 h-3 text-amber-700" />
+              </button>
+              <span className="text-sm font-semibold text-slate-900 w-6 text-center">
+                {item.cantidadCajas}
+              </span>
+              <button
+                onClick={() => onCambiarCajas(p.id, 1)}
+                disabled={item.cantidadCajas >= maxCajas(p)}
+                className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 flex items-center justify-center transition-colors"
+              >
+                <Plus className="w-3 h-3 text-amber-700" />
+              </button>
+              <span className="text-xs text-amber-700 font-medium">caja</span>
+            </div>
+            {item.cantidadCajas > 0 && p.precio_caja && (
+              <span className="text-xs text-slate-500">
+                {formatMXN(item.cantidadCajas * Number(p.precio_caja))}
+              </span>
+            )}
+          </div>
+
+          {/* Piezas row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onCambiarPiezas(p.id, -1)}
+                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+              >
+                <Minus className="w-3 h-3 text-slate-700" />
+              </button>
+              <span className="text-sm font-semibold text-slate-900 w-6 text-center">
+                {item.cantidadPiezas}
+              </span>
+              <button
+                onClick={() => onCambiarPiezas(p.id, 1)}
+                disabled={item.cantidadPiezas >= maxPiezas(item)}
+                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition-colors"
+              >
+                <Plus className="w-3 h-3 text-slate-700" />
+              </button>
+              <span className="text-xs text-slate-500">{p.unidad}</span>
+            </div>
+            {item.cantidadPiezas > 0 && (
+              <span className="text-xs text-slate-500">
+                {formatMXN(item.cantidadPiezas * Number(p.precio_menudeo))}
+              </span>
+            )}
+          </div>
+
+          {/* Total row */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <span className="text-xs text-slate-400">Subtotal</span>
+            <span className="text-sm font-bold text-slate-900">{formatMXN(subtotalItem(item))}</span>
+          </div>
+        </div>
+      ) : (
+        /* ── Product without box pricing: single stepper ── */
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onCambiarPiezas(p.id, -1)}
+              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+            >
+              <Minus className="w-3.5 h-3.5 text-slate-700" />
+            </button>
+            <span className="text-sm font-semibold text-slate-900 w-8 text-center">
+              {item.cantidadPiezas}
+            </span>
+            <button
+              onClick={() => onCambiarPiezas(p.id, 1)}
+              disabled={item.cantidadPiezas >= p.stock_fisico}
+              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-700" />
+            </button>
+            <span className="text-xs text-slate-400">{p.unidad}</span>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-slate-900">{formatMXN(subtotalItem(item))}</p>
+            <p className={`text-xs ${esMayoreo ? 'text-green-600' : 'text-slate-400'}`}>
+              {formatMXN(esMayoreo ? Number(p.precio_mayoreo) : Number(p.precio_menudeo))} c/{p.unidad}
+              {esMayoreo ? ' · mayoreo' : ''}
+            </p>
+          </div>
         </div>
       )}
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onCambiarCantidad(item.producto.id, -1)}
-            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-          >
-            <Minus className="w-3.5 h-3.5 text-slate-700" />
-          </button>
-          <span className="text-sm font-semibold text-slate-900 w-8 text-center">
-            {item.cantidad}
-          </span>
-          <button
-            onClick={() => onCambiarCantidad(item.producto.id, 1)}
-            disabled={item.cantidad >= maxCantidad}
-            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-slate-700" />
-          </button>
-          <span className="text-xs text-slate-400">{unidadLabel}</span>
-        </div>
-
-        <div className="text-right">
-          <p className="text-sm font-bold text-slate-900">{formatMXN(precio * item.cantidad)}</p>
-          <p className={`text-xs ${esMayoreo ? 'text-green-600' : 'text-slate-400'}`}>
-            {formatMXN(precio)} c/{unidadLabel}{esMayoreo ? ' ·mayoreo' : ''}
-          </p>
-        </div>
-      </div>
     </li>
   )
 }
@@ -222,15 +258,15 @@ function CartItemRow({
 // ── Cart panel ─────────────────────────────────────────────────
 function CarritoPanel({
   carrito,
-  onCambiarCantidad,
-  onCambiarModo,
+  onCambiarCajas,
+  onCambiarPiezas,
   onEliminar,
   onConfirmar,
   confirmando,
 }: {
   carrito: CartItem[]
-  onCambiarCantidad: (id: string, delta: number) => void
-  onCambiarModo: (id: string, modoCaja: boolean) => void
+  onCambiarCajas: (id: string, delta: number) => void
+  onCambiarPiezas: (id: string, delta: number) => void
   onEliminar: (id: string) => void
   onConfirmar: () => void
   confirmando: boolean
@@ -254,8 +290,8 @@ function CarritoPanel({
           <CartItemRow
             key={item.producto.id}
             item={item}
-            onCambiarCantidad={onCambiarCantidad}
-            onCambiarModo={onCambiarModo}
+            onCambiarCajas={onCambiarCajas}
+            onCambiarPiezas={onCambiarPiezas}
             onEliminar={onEliminar}
           />
         ))}
@@ -293,12 +329,14 @@ function VentaExitosaScreen({ venta, onNuevaVenta }: { venta: VentaExitosa; onNu
 
       <div className="w-full max-w-xs bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100 mb-6 text-left overflow-hidden">
         {venta.items.map(item => {
-          const unidad = item.modoCaja ? 'caja' : item.producto.unidad
+          const parts: string[] = []
+          if (item.cantidadCajas > 0) parts.push(`${item.cantidadCajas} caja(s)`)
+          if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.producto.unidad}`)
           return (
             <div key={item.producto.id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-slate-900 line-clamp-1">{item.producto.nombre}</p>
-                <p className="text-xs text-slate-400">× {item.cantidad} {unidad}</p>
+                <p className="text-xs text-slate-400">× {parts.join(' + ')}</p>
               </div>
               <p className="text-sm font-semibold text-slate-900">{formatMXN(subtotalItem(item))}</p>
             </div>
@@ -322,14 +360,14 @@ function VentaExitosaScreen({ venta, onNuevaVenta }: { venta: VentaExitosa; onNu
 
 // ── Main ───────────────────────────────────────────────────────
 export default function VentaClient() {
-  const [productos,     setProductos]     = useState<Producto[]>([])
-  const [loading,       setLoading]       = useState(true)
-  const [search,        setSearch]        = useState('')
-  const [carrito,       setCarrito]       = useState<CartItem[]>([])
-  const [showCarrito,   setShowCarrito]   = useState(false)
-  const [confirmando,   setConfirmando]   = useState(false)
-  const [ventaExitosa,  setVentaExitosa]  = useState<VentaExitosa | null>(null)
-  const [error,         setError]         = useState('')
+  const [productos,    setProductos]    = useState<Producto[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [search,       setSearch]       = useState('')
+  const [carrito,      setCarrito]      = useState<CartItem[]>([])
+  const [showCarrito,  setShowCarrito]  = useState(false)
+  const [confirmando,  setConfirmando]  = useState(false)
+  const [ventaExitosa, setVentaExitosa] = useState<VentaExitosa | null>(null)
+  const [error,        setError]        = useState('')
 
   const fetchProductos = useCallback(async () => {
     const { data } = await createClient()
@@ -364,45 +402,48 @@ export default function VentaClient() {
     setCarrito(prev => {
       const idx = prev.findIndex(i => i.producto.id === producto.id)
       if (idx >= 0) {
+        const item = prev[idx]
+        if (item.cantidadPiezas >= maxPiezas(item)) return prev
         const updated = [...prev]
-        const item    = updated[idx]
-        const max     = item.modoCaja && producto.piezas_por_caja
-          ? Math.floor(producto.stock_fisico / producto.piezas_por_caja)
-          : producto.stock_fisico
-        if (item.cantidad >= max) return prev
-        updated[idx] = { ...item, cantidad: item.cantidad + 1 }
+        updated[idx] = { ...item, cantidadPiezas: item.cantidadPiezas + 1 }
         return updated
       }
-      return [...prev, { producto, cantidad: 1, modoCaja: false }]
+      return [...prev, { producto, cantidadCajas: 0, cantidadPiezas: 1 }]
     })
   }
 
-  function cambiarCantidad(productoId: string, delta: number) {
+  function cambiarCajas(productoId: string, delta: number) {
     setCarrito(prev =>
       prev
         .map(i => {
           if (i.producto.id !== productoId) return i
-          const max     = i.modoCaja && i.producto.piezas_por_caja
-            ? Math.floor(i.producto.stock_fisico / i.producto.piezas_por_caja)
-            : i.producto.stock_fisico
-          const nueva   = i.cantidad + delta
-          if (nueva <= 0) return null
-          if (nueva > max) return i
-          return { ...i, cantidad: nueva }
+          const nueva = i.cantidadCajas + delta
+          if (nueva < 0) return i
+          if (nueva > maxCajas(i.producto)) return i
+          // Clamp piezas to not exceed available stock
+          const piezasDisp = i.producto.stock_fisico - nueva * (i.producto.piezas_por_caja ?? 0)
+          const piezas = Math.min(i.cantidadPiezas, Math.max(0, piezasDisp))
+          if (nueva === 0 && piezas === 0) return null
+          return { ...i, cantidadCajas: nueva, cantidadPiezas: piezas }
         })
         .filter(Boolean) as CartItem[]
     )
   }
 
-  function cambiarModo(productoId: string, modoCaja: boolean) {
+  function cambiarPiezas(productoId: string, delta: number) {
     setCarrito(prev =>
-      prev.map(i => {
-        if (i.producto.id !== productoId) return i
-        const max = modoCaja && i.producto.piezas_por_caja
-          ? Math.floor(i.producto.stock_fisico / i.producto.piezas_por_caja)
-          : i.producto.stock_fisico
-        return { ...i, modoCaja, cantidad: Math.min(i.cantidad, max) }
-      })
+      prev
+        .map(i => {
+          if (i.producto.id !== productoId) return i
+          const nueva = i.cantidadPiezas + delta
+          if (nueva < 0) {
+            if (i.cantidadCajas === 0) return null
+            return { ...i, cantidadPiezas: 0 }
+          }
+          if (nueva > maxPiezas(i)) return i
+          return { ...i, cantidadPiezas: nueva }
+        })
+        .filter(Boolean) as CartItem[]
     )
   }
 
@@ -415,16 +456,16 @@ export default function VentaClient() {
     setConfirmando(true)
     setError('')
 
-    const supabase                          = createClient()
-    const { data: { user } }               = await supabase.auth.getUser()
-    const { data: actuales }               = await supabase
+    const supabase          = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: actuales } = await supabase
       .from('productos')
       .select('id, stock_fisico, nombre')
       .in('id', carrito.map(i => i.producto.id))
 
     for (const item of carrito) {
-      const actual     = actuales?.find(p => p.id === item.producto.id)
-      const piezas     = piezasReales(item)
+      const actual = actuales?.find(p => p.id === item.producto.id)
+      const piezas = piezasReales(item)
       if (!actual || actual.stock_fisico < piezas) {
         setError(`Sin stock suficiente: ${actual?.nombre ?? item.producto.nombre}`)
         setConfirmando(false)
@@ -436,7 +477,11 @@ export default function VentaClient() {
       const actual     = actuales!.find(p => p.id === item.producto.id)!
       const piezas     = piezasReales(item)
       const nuevoStock = actual.stock_fisico - piezas
-      const modoLabel  = item.modoCaja ? `${item.cantidad} caja(s)` : `${item.cantidad} ${item.producto.unidad}`
+
+      const parts: string[] = []
+      if (item.cantidadCajas > 0) parts.push(`${item.cantidadCajas} caja(s)`)
+      if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.producto.unidad}`)
+      const modoLabel = parts.join(' + ')
 
       await supabase.from('stock_ledger').insert({
         producto_id: item.producto.id,
@@ -461,8 +506,8 @@ export default function VentaClient() {
     fetchProductos()
   }
 
-  const totalItems = carrito.reduce((a, i) => a + i.cantidad, 0)
-  const total      = totalCarrito(carrito)
+  const totalProductos = carrito.length
+  const total          = totalCarrito(carrito)
 
   if (ventaExitosa) {
     return (
@@ -525,9 +570,9 @@ export default function VentaClient() {
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-slate-600" />
             <span className="text-sm font-semibold text-slate-900">Carrito</span>
-            {totalItems > 0 && (
+            {totalProductos > 0 && (
               <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
-                {totalItems}
+                {totalProductos}
               </span>
             )}
           </div>
@@ -546,8 +591,8 @@ export default function VentaClient() {
 
         <CarritoPanel
           carrito={carrito}
-          onCambiarCantidad={cambiarCantidad}
-          onCambiarModo={cambiarModo}
+          onCambiarCajas={cambiarCajas}
+          onCambiarPiezas={cambiarPiezas}
           onEliminar={eliminarDelCarrito}
           onConfirmar={confirmarVenta}
           confirmando={confirmando}
@@ -555,7 +600,7 @@ export default function VentaClient() {
       </div>
 
       {/* ── Mobile floating button ───────────────────────────── */}
-      {totalItems > 0 && !showCarrito && (
+      {totalProductos > 0 && !showCarrito && (
         <button
           onClick={() => setShowCarrito(true)}
           className="lg:hidden fixed bottom-6 left-4 right-4 z-30 h-14 bg-violet-600 text-white rounded-2xl shadow-lg flex items-center justify-between px-5"
@@ -564,10 +609,10 @@ export default function VentaClient() {
             <div className="relative">
               <ShoppingCart className="w-5 h-5" />
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-white text-violet-600 text-xs font-bold flex items-center justify-center">
-                {totalItems}
+                {totalProductos}
               </span>
             </div>
-            <span className="text-sm font-semibold">{totalItems} producto{totalItems !== 1 ? 's' : ''}</span>
+            <span className="text-sm font-semibold">{totalProductos} producto{totalProductos !== 1 ? 's' : ''}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold">{formatMXN(total)}</span>
@@ -586,7 +631,7 @@ export default function VentaClient() {
                 <ShoppingCart className="w-4 h-4 text-slate-700" />
                 <span className="text-sm font-semibold text-slate-900">Carrito</span>
                 <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
-                  {totalItems}
+                  {totalProductos}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -607,8 +652,8 @@ export default function VentaClient() {
 
             <CarritoPanel
               carrito={carrito}
-              onCambiarCantidad={cambiarCantidad}
-              onCambiarModo={cambiarModo}
+              onCambiarCajas={cambiarCajas}
+              onCambiarPiezas={cambiarPiezas}
               onEliminar={eliminarDelCarrito}
               onConfirmar={async () => { await confirmarVenta(); setShowCarrito(false) }}
               confirmando={confirmando}

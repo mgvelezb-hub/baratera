@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardList, TrendingUp, Settings2, Trash2, Pencil } from 'lucide-react'
-import type { Producto, MovimientoTipo } from '@/lib/types'
+import { TrendingUp, Settings2, Trash2, Pencil } from 'lucide-react'
+import type { Producto } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import MovimientoModal from '@/components/MovimientoModal'
@@ -16,7 +16,7 @@ interface Props {
 export default function ProductoDetailClient({ producto }: Props) {
   const router = useRouter()
   const { isAdmin } = useIsAdmin()
-  const [modalTipo,    setModalTipo]    = useState<MovimientoTipo | null>(null)
+  const [modalTipo,    setModalTipo]    = useState<'entrada_compra' | 'ajuste_positivo' | null>(null)
   const [showEditar,   setShowEditar]   = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting,     setDeleting]     = useState(false)
@@ -40,14 +40,7 @@ export default function ProductoDetailClient({ producto }: Props) {
   return (
     <>
       {/* ── Movement actions ──────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          onClick={() => setModalTipo('levantamiento_inventario')}
-          className="h-12 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors"
-        >
-          <ClipboardList className="w-4 h-4" />
-          Levantar
-        </button>
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => setModalTipo('entrada_compra')}
           className="h-12 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors"

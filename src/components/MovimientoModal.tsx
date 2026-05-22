@@ -13,7 +13,9 @@ interface Props {
   defaultTipo?: MovimientoTipo
 }
 
-export default function MovimientoModal({ producto, onClose, onSuccess, defaultTipo = 'salida_venta_manual' }: Props) {
+const TIPOS_VISIBLES: MovimientoTipo[] = ['entrada_compra', 'ajuste_positivo', 'ajuste_negativo', 'devolucion']
+
+export default function MovimientoModal({ producto, onClose, onSuccess, defaultTipo = 'entrada_compra' }: Props) {
   const [tipo, setTipo] = useState<MovimientoTipo>(defaultTipo)
   const [cantidad, setCantidad] = useState('')
   const [notas, setNotas] = useState('')
@@ -96,27 +98,30 @@ export default function MovimientoModal({ producto, onClose, onSuccess, defaultT
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Tipo</label>
             <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(TIPOS_MOVIMIENTO) as [MovimientoTipo, typeof TIPOS_MOVIMIENTO[MovimientoTipo]][]).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setTipo(key); setError('') }}
-                  className={`h-10 px-3 rounded-lg text-sm font-medium border transition-colors text-left ${
-                    tipo === key
-                      ? 'bg-violet-50 border-violet-300 text-violet-700'
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {cfg.label}
-                </button>
-              ))}
+              {TIPOS_VISIBLES.map(key => {
+                const cfg = TIPOS_MOVIMIENTO[key]
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => { setTipo(key); setError('') }}
+                    className={`h-10 px-3 rounded-lg text-sm font-medium border transition-colors text-left ${
+                      tipo === key
+                        ? 'bg-violet-50 border-violet-300 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {cfg.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Cantidad */}
           <div>
             <label htmlFor="cantidad" className="block text-sm font-medium text-slate-700 mb-1.5">
-              {tipo === 'levantamiento_inventario' ? 'Cantidad contada' : 'Cantidad'}
+              Cantidad
             </label>
             <input
               id="cantidad"
@@ -125,7 +130,6 @@ export default function MovimientoModal({ producto, onClose, onSuccess, defaultT
               value={cantidad}
               onChange={e => { setCantidad(e.target.value); setError('') }}
               required
-              autoFocus
               className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-center text-lg font-semibold"
               placeholder="0"
             />

@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, ClipboardList, Plus, Trash2 } from 'lucide-react'
+import { MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
+import EditarProductoModal from '@/app/inventario/EditarProductoModal'
 
 interface Props {
   producto: Producto
@@ -17,25 +18,30 @@ interface Props {
 }
 
 export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
-  const [showMenu, setShowMenu] = useState(false)
+  const [showMenu,      setShowMenu]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [modalTipo, setModalTipo] = useState<'levantamiento_inventario' | 'entrada_compra' | null>(null)
+  const [deleting,      setDeleting]      = useState(false)
+  const [showEditar,    setShowEditar]    = useState(false)
+  const [modalTipo,     setModalTipo]     = useState<'entrada_compra' | null>(null)
+
+  const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
   async function handleDesactivar() {
     setDeleting(true)
-    const supabase = createClient()
-    await supabase.from('productos').update({ activo: false }).eq('id', producto.id)
+    await createClient().from('productos').update({ activo: false }).eq('id', producto.id)
     setDeleting(false)
     setShowMenu(false)
     setConfirmDelete(false)
     onRefresh()
   }
 
-  const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
-
   function handleMovimientoSuccess() {
     setModalTipo(null)
+    onRefresh()
+  }
+
+  function handleEditarSuccess() {
+    setShowEditar(false)
     onRefresh()
   }
 
@@ -70,13 +76,6 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[180px]">
                       <button
-                        onClick={() => { setShowMenu(false); setModalTipo('levantamiento_inventario') }}
-                        className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <ClipboardList className="w-4 h-4 text-blue-500" />
-                        Levantar inventario
-                      </button>
-                      <button
                         onClick={() => { setShowMenu(false); setModalTipo('entrada_compra') }}
                         className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                       >
@@ -93,6 +92,14 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
                       </Link>
                       {isAdmin && (
                         <>
+                          <hr className="my-1 border-slate-100" />
+                          <button
+                            onClick={() => { setShowMenu(false); setShowEditar(true) }}
+                            className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                          >
+                            <Pencil className="w-4 h-4 text-violet-500" />
+                            Editar producto
+                          </button>
                           <hr className="my-1 border-slate-100" />
                           {confirmDelete ? (
                             <div className="px-3 py-2">
@@ -153,15 +160,6 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
               )}
             </div>
           </div>
-
-          {/* Quick action — levantar inventario */}
-          <button
-            onClick={() => setModalTipo('levantamiento_inventario')}
-            className="mt-3 w-full h-9 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            Levantar inventario
-          </button>
         </div>
       </div>
 
@@ -171,6 +169,14 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
           defaultTipo={modalTipo}
           onClose={() => setModalTipo(null)}
           onSuccess={handleMovimientoSuccess}
+        />
+      )}
+
+      {showEditar && (
+        <EditarProductoModal
+          producto={producto}
+          onClose={() => setShowEditar(false)}
+          onSuccess={handleEditarSuccess}
         />
       )}
     </>

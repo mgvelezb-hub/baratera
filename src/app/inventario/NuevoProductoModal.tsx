@@ -109,7 +109,6 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
               value={form.nombre}
               onChange={e => set('nombre', e.target.value)}
               required
-              autoFocus
               className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               placeholder="Ej: Cuaderno Profesional 100 hojas"
             />
