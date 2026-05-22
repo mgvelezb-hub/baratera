@@ -123,21 +123,73 @@ function ProductoCardPOS({
   )
 }
 
+// ── Stepper with editable input ────────────────────────────────
+function Stepper({
+  value,
+  max,
+  onChange,
+  color,
+  label,
+}: {
+  value: number
+  max: number
+  onChange: (v: number) => void
+  color: 'amber' | 'slate'
+  label: string
+}) {
+  const btnBase = color === 'amber'
+    ? 'bg-amber-100 hover:bg-amber-200 text-amber-700'
+    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+  const labelClass = color === 'amber'
+    ? 'text-xs text-amber-700 font-medium'
+    : 'text-xs text-slate-500'
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${btnBase}`}
+      >
+        <Minus className="w-3 h-3" />
+      </button>
+      <input
+        type="number"
+        min="0"
+        max={max}
+        value={value}
+        onChange={e => {
+          const v = Math.max(0, Math.min(max, parseInt(e.target.value) || 0))
+          onChange(v)
+        }}
+        className="w-10 h-7 text-sm font-semibold text-slate-900 text-center bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-300"
+      />
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 ${btnBase}`}
+      >
+        <Plus className="w-3 h-3" />
+      </button>
+      <span className={labelClass}>{label}</span>
+    </div>
+  )
+}
+
 // ── Cart item row ──────────────────────────────────────────────
 function CartItemRow({
   item,
-  onCambiarCajas,
-  onCambiarPiezas,
+  onSetCajas,
+  onSetPiezas,
   onEliminar,
 }: {
   item: CartItem
-  onCambiarCajas: (id: string, delta: number) => void
-  onCambiarPiezas: (id: string, delta: number) => void
+  onSetCajas: (id: string, valor: number) => void
+  onSetPiezas: (id: string, valor: number) => void
   onEliminar: (id: string) => void
 }) {
   const p         = item.producto
   const tieneCaja = !!(p.precio_caja && p.piezas_por_caja)
-  const esMayoreo = !tieneCaja && item.cantidadCajas === 0 &&
+  const esMayoreo = !tieneCaja &&
     p.precio_mayoreo && p.umbral_mayoreo &&
     item.cantidadPiezas >= p.umbral_mayoreo
 
@@ -158,27 +210,14 @@ function CartItemRow({
       {tieneCaja ? (
         /* ── Product with box pricing: two independent steppers ── */
         <div className="space-y-1.5">
-          {/* Cajas row */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onCambiarCajas(p.id, -1)}
-                className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 flex items-center justify-center transition-colors"
-              >
-                <Minus className="w-3 h-3 text-amber-700" />
-              </button>
-              <span className="text-sm font-semibold text-slate-900 w-6 text-center">
-                {item.cantidadCajas}
-              </span>
-              <button
-                onClick={() => onCambiarCajas(p.id, 1)}
-                disabled={item.cantidadCajas >= maxCajas(p)}
-                className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-40 flex items-center justify-center transition-colors"
-              >
-                <Plus className="w-3 h-3 text-amber-700" />
-              </button>
-              <span className="text-xs text-amber-700 font-medium">caja</span>
-            </div>
+            <Stepper
+              value={item.cantidadCajas}
+              max={maxCajas(p)}
+              onChange={v => onSetCajas(p.id, v)}
+              color="amber"
+              label="caja"
+            />
             {item.cantidadCajas > 0 && p.precio_caja && (
               <span className="text-xs text-slate-500">
                 {formatMXN(item.cantidadCajas * Number(p.precio_caja))}
@@ -186,27 +225,14 @@ function CartItemRow({
             )}
           </div>
 
-          {/* Piezas row */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onCambiarPiezas(p.id, -1)}
-                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-              >
-                <Minus className="w-3 h-3 text-slate-700" />
-              </button>
-              <span className="text-sm font-semibold text-slate-900 w-6 text-center">
-                {item.cantidadPiezas}
-              </span>
-              <button
-                onClick={() => onCambiarPiezas(p.id, 1)}
-                disabled={item.cantidadPiezas >= maxPiezas(item)}
-                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition-colors"
-              >
-                <Plus className="w-3 h-3 text-slate-700" />
-              </button>
-              <span className="text-xs text-slate-500">{p.unidad}</span>
-            </div>
+            <Stepper
+              value={item.cantidadPiezas}
+              max={maxPiezas(item)}
+              onChange={v => onSetPiezas(p.id, v)}
+              color="slate"
+              label="pza"
+            />
             {item.cantidadPiezas > 0 && (
               <span className="text-xs text-slate-500">
                 {formatMXN(item.cantidadPiezas * Number(p.precio_menudeo))}
@@ -214,7 +240,6 @@ function CartItemRow({
             )}
           </div>
 
-          {/* Total row */}
           <div className="flex items-center justify-between pt-1 border-t border-slate-100">
             <span className="text-xs text-slate-400">Subtotal</span>
             <span className="text-sm font-bold text-slate-900">{formatMXN(subtotalItem(item))}</span>
@@ -223,25 +248,13 @@ function CartItemRow({
       ) : (
         /* ── Product without box pricing: single stepper ── */
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onCambiarPiezas(p.id, -1)}
-              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-            >
-              <Minus className="w-3.5 h-3.5 text-slate-700" />
-            </button>
-            <span className="text-sm font-semibold text-slate-900 w-8 text-center">
-              {item.cantidadPiezas}
-            </span>
-            <button
-              onClick={() => onCambiarPiezas(p.id, 1)}
-              disabled={item.cantidadPiezas >= p.stock_fisico}
-              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5 text-slate-700" />
-            </button>
-            <span className="text-xs text-slate-400">{p.unidad}</span>
-          </div>
+          <Stepper
+            value={item.cantidadPiezas}
+            max={p.stock_fisico}
+            onChange={v => onSetPiezas(p.id, v)}
+            color="slate"
+            label={p.unidad}
+          />
           <div className="text-right">
             <p className="text-sm font-bold text-slate-900">{formatMXN(subtotalItem(item))}</p>
             <p className={`text-xs ${esMayoreo ? 'text-green-600' : 'text-slate-400'}`}>
@@ -258,15 +271,15 @@ function CartItemRow({
 // ── Cart panel ─────────────────────────────────────────────────
 function CarritoPanel({
   carrito,
-  onCambiarCajas,
-  onCambiarPiezas,
+  onSetCajas,
+  onSetPiezas,
   onEliminar,
   onConfirmar,
   confirmando,
 }: {
   carrito: CartItem[]
-  onCambiarCajas: (id: string, delta: number) => void
-  onCambiarPiezas: (id: string, delta: number) => void
+  onSetCajas: (id: string, valor: number) => void
+  onSetPiezas: (id: string, valor: number) => void
   onEliminar: (id: string) => void
   onConfirmar: () => void
   confirmando: boolean
@@ -290,8 +303,8 @@ function CarritoPanel({
           <CartItemRow
             key={item.producto.id}
             item={item}
-            onCambiarCajas={onCambiarCajas}
-            onCambiarPiezas={onCambiarPiezas}
+            onSetCajas={onSetCajas}
+            onSetPiezas={onSetPiezas}
             onEliminar={onEliminar}
           />
         ))}
@@ -412,15 +425,12 @@ export default function VentaClient() {
     })
   }
 
-  function cambiarCajas(productoId: string, delta: number) {
+  function setCantidadCajas(productoId: string, valor: number) {
     setCarrito(prev =>
       prev
         .map(i => {
           if (i.producto.id !== productoId) return i
-          const nueva = i.cantidadCajas + delta
-          if (nueva < 0) return i
-          if (nueva > maxCajas(i.producto)) return i
-          // Clamp piezas to not exceed available stock
+          const nueva = Math.max(0, Math.min(valor, maxCajas(i.producto)))
           const piezasDisp = i.producto.stock_fisico - nueva * (i.producto.piezas_por_caja ?? 0)
           const piezas = Math.min(i.cantidadPiezas, Math.max(0, piezasDisp))
           if (nueva === 0 && piezas === 0) return null
@@ -430,17 +440,13 @@ export default function VentaClient() {
     )
   }
 
-  function cambiarPiezas(productoId: string, delta: number) {
+  function setCantidadPiezas(productoId: string, valor: number) {
     setCarrito(prev =>
       prev
         .map(i => {
           if (i.producto.id !== productoId) return i
-          const nueva = i.cantidadPiezas + delta
-          if (nueva < 0) {
-            if (i.cantidadCajas === 0) return null
-            return { ...i, cantidadPiezas: 0 }
-          }
-          if (nueva > maxPiezas(i)) return i
+          const nueva = Math.max(0, Math.min(valor, maxPiezas(i)))
+          if (nueva === 0 && i.cantidadCajas === 0) return null
           return { ...i, cantidadPiezas: nueva }
         })
         .filter(Boolean) as CartItem[]
@@ -591,8 +597,8 @@ export default function VentaClient() {
 
         <CarritoPanel
           carrito={carrito}
-          onCambiarCajas={cambiarCajas}
-          onCambiarPiezas={cambiarPiezas}
+          onSetCajas={setCantidadCajas}
+          onSetPiezas={setCantidadPiezas}
           onEliminar={eliminarDelCarrito}
           onConfirmar={confirmarVenta}
           confirmando={confirmando}
@@ -652,8 +658,8 @@ export default function VentaClient() {
 
             <CarritoPanel
               carrito={carrito}
-              onCambiarCajas={cambiarCajas}
-              onCambiarPiezas={cambiarPiezas}
+              onSetCajas={setCantidadCajas}
+              onSetPiezas={setCantidadPiezas}
               onEliminar={eliminarDelCarrito}
               onConfirmar={async () => { await confirmarVenta(); setShowCarrito(false) }}
               confirmando={confirmando}
