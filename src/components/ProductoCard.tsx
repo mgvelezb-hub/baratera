@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, ClipboardList, TrendingDown, Plus, Trash2 } from 'lucide-react'
+import { MoreVertical, ClipboardList, Plus, Trash2 } from 'lucide-react'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
@@ -20,7 +20,7 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
   const [showMenu, setShowMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [modalTipo, setModalTipo] = useState<'levantamiento_inventario' | 'salida_venta_manual' | 'entrada_compra' | null>(null)
+  const [modalTipo, setModalTipo] = useState<'levantamiento_inventario' | 'entrada_compra' | null>(null)
 
   async function handleDesactivar() {
     setDeleting(true)
@@ -82,13 +82,6 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
                       >
                         <Plus className="w-4 h-4 text-green-500" />
                         Entrada (compra)
-                      </button>
-                      <button
-                        onClick={() => { setShowMenu(false); setModalTipo('salida_venta_manual') }}
-                        className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <TrendingDown className="w-4 h-4 text-amber-500" />
-                        Registrar venta
                       </button>
                       <hr className="my-1 border-slate-100" />
                       <Link

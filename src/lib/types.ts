@@ -8,6 +8,8 @@ export interface Producto {
   precio_menudeo: number
   precio_mayoreo: number | null
   umbral_mayoreo: number | null
+  precio_caja: number | null
+  piezas_por_caja: number | null
   stock_fisico: number
   stock_minimo: number
   unidad: string

@@ -131,7 +131,7 @@ export default function Sidebar() {
             className="lg:hidden fixed inset-0 z-50 bg-black/50"
             onClick={() => setOpen(false)}
           />
-          <aside className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-72 bg-white flex flex-col shadow-xl">
+          <aside className="lg:hidden fixed right-0 top-0 bottom-0 z-50 w-72 bg-white flex flex-col shadow-xl">
             <div className="flex items-center justify-between h-14 px-4 border-b border-slate-200">
               <LogoBlock />
               <button
