@@ -1,26 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+
+  /* Módulo WMS — purple */
+  --p50: #EEEDFE;
+  --p200: #AFA9EC;
+  --p600: #534AB7;
+  --p800: #3C3489;
+
+  /* Módulo OMS / WebApp — teal */
+  --t50: #E1F5EE;
+  --t200: #5DCAA5;
+  --t600: #0F6E56;
+  --t800: #085041;
+
+  /* Módulo POS — amber */
+  --a50: #FAEEDA;
+  --a200: #EF9F27;
+  --a600: #854F0B;
+  --a800: #633806;
+
+  --border: #E2E8F0;
+  --muted: #64748B;
+  --surface: #FFFFFF;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+/* Touch targets mínimos */
+button, a[role="button"], [role="button"] {
+  cursor: pointer;
+}
+
+/* Scrollbar delgada */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
