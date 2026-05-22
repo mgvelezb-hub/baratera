@@ -5,6 +5,7 @@ import { Plus, Search, AlertTriangle, Package, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import ProductoCard from '@/components/ProductoCard'
 import NuevoProductoModal from './NuevoProductoModal'
 
@@ -16,6 +17,7 @@ export default function InventarioClient() {
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroSemaforo>('todos')
   const [showNuevo, setShowNuevo] = useState(false)
+  const { isAdmin } = useIsAdmin()
 
   const fetchProductos = useCallback(async () => {
     const supabase = createClient()
@@ -57,13 +59,15 @@ export default function InventarioClient() {
           <h1 className="text-xl font-semibold text-slate-900">Inventario</h1>
           <p className="text-sm text-slate-500 mt-0.5">{productos.length} productos</p>
         </div>
-        <button
-          onClick={() => setShowNuevo(true)}
-          className="h-10 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Agregar
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowNuevo(true)}
+            className="h-10 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar
+          </button>
+        )}
       </div>
 
       {/* Resumen semáforo */}
@@ -158,6 +162,7 @@ export default function InventarioClient() {
             <ProductoCard
               key={producto.id}
               producto={producto}
+              isAdmin={isAdmin}
               onRefresh={fetchProductos}
             />
           ))}

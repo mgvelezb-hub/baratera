@@ -2,21 +2,35 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, ClipboardList, TrendingDown, Plus } from 'lucide-react'
+import { MoreVertical, ClipboardList, TrendingDown, Plus, Trash2 } from 'lucide-react'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
 
 interface Props {
   producto: Producto
+  isAdmin: boolean
   onRefresh: () => void
 }
 
-export default function ProductoCard({ producto, onRefresh }: Props) {
+export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
   const [showMenu, setShowMenu] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [modalTipo, setModalTipo] = useState<'levantamiento_inventario' | 'salida_venta_manual' | 'entrada_compra' | null>(null)
+
+  async function handleDesactivar() {
+    setDeleting(true)
+    const supabase = createClient()
+    await supabase.from('productos').update({ activo: false }).eq('id', producto.id)
+    setDeleting(false)
+    setShowMenu(false)
+    setConfirmDelete(false)
+    onRefresh()
+  }
 
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
@@ -54,7 +68,7 @@ export default function ProductoCard({ producto, onRefresh }: Props) {
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[160px]">
+                    <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[180px]">
                       <button
                         onClick={() => { setShowMenu(false); setModalTipo('levantamiento_inventario') }}
                         className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
@@ -84,6 +98,39 @@ export default function ProductoCard({ producto, onRefresh }: Props) {
                       >
                         Ver historial
                       </Link>
+                      {isAdmin && (
+                        <>
+                          <hr className="my-1 border-slate-100" />
+                          {confirmDelete ? (
+                            <div className="px-3 py-2">
+                              <p className="text-xs text-slate-500 mb-2">¿Desactivar este producto?</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleDesactivar}
+                                  disabled={deleting}
+                                  className="flex-1 h-7 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  {deleting ? '...' : 'Sí, desactivar'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelete(false)}
+                                  className="flex-1 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDelete(true)}
+                              className="w-full h-9 px-3 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Desactivar producto
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </>
                 )}
