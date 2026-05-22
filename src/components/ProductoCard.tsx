@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
+import { MoreVertical, Plus, Trash2, Pencil, AlertOctagon } from 'lucide-react'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
@@ -18,20 +18,32 @@ interface Props {
 }
 
 export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
-  const [showMenu,      setShowMenu]      = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
-  const [showEditar,    setShowEditar]    = useState(false)
-  const [modalTipo,     setModalTipo]     = useState<'entrada_compra' | null>(null)
+  const [showMenu,        setShowMenu]        = useState(false)
+  const [confirmDesact,   setConfirmDesact]   = useState(false)
+  const [confirmEliminar, setConfirmEliminar] = useState(false)
+  const [loading,         setLoading]         = useState(false)
+  const [showEditar,      setShowEditar]       = useState(false)
+  const [modalTipo,       setModalTipo]        = useState<'entrada_compra' | null>(null)
 
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
   async function handleDesactivar() {
-    setDeleting(true)
+    setLoading(true)
     await createClient().from('productos').update({ activo: false }).eq('id', producto.id)
-    setDeleting(false)
+    setLoading(false)
     setShowMenu(false)
-    setConfirmDelete(false)
+    setConfirmDesact(false)
+    onRefresh()
+  }
+
+  async function handleEliminar() {
+    setLoading(true)
+    const supabase = createClient()
+    await supabase.from('stock_ledger').delete().eq('producto_id', producto.id)
+    await supabase.from('productos').delete().eq('id', producto.id)
+    setLoading(false)
+    setShowMenu(false)
+    setConfirmEliminar(false)
     onRefresh()
   }
 
@@ -101,33 +113,64 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
                             Editar producto
                           </button>
                           <hr className="my-1 border-slate-100" />
-                          {confirmDelete ? (
+                          {!confirmDesact && !confirmEliminar && (
+                            <>
+                              <button
+                                onClick={() => setConfirmDesact(true)}
+                                className="w-full h-9 px-3 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Desactivar producto
+                              </button>
+                              <button
+                                onClick={() => setConfirmEliminar(true)}
+                                className="w-full h-9 px-3 text-sm text-left text-red-700 hover:bg-red-50 flex items-center gap-2 font-medium"
+                              >
+                                <AlertOctagon className="w-4 h-4" />
+                                Eliminar permanentemente
+                              </button>
+                            </>
+                          )}
+                          {confirmDesact && (
                             <div className="px-3 py-2">
                               <p className="text-xs text-slate-500 mb-2">¿Desactivar este producto?</p>
                               <div className="flex gap-2">
                                 <button
                                   onClick={handleDesactivar}
-                                  disabled={deleting}
+                                  disabled={loading}
                                   className="flex-1 h-7 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-xs font-semibold rounded-lg transition-colors"
                                 >
-                                  {deleting ? '...' : 'Sí, desactivar'}
+                                  {loading ? '...' : 'Sí, desactivar'}
                                 </button>
                                 <button
-                                  onClick={() => setConfirmDelete(false)}
+                                  onClick={() => setConfirmDesact(false)}
                                   className="flex-1 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
                                 >
                                   Cancelar
                                 </button>
                               </div>
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDelete(true)}
-                              className="w-full h-9 px-3 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Desactivar producto
-                            </button>
+                          )}
+                          {confirmEliminar && (
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-red-700 mb-1">¿Eliminar permanentemente?</p>
+                              <p className="text-xs text-slate-500 mb-2">Se borran el producto y todo su historial.</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleEliminar}
+                                  disabled={loading}
+                                  className="flex-1 h-7 bg-red-700 hover:bg-red-800 disabled:bg-red-400 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  {loading ? '...' : 'Sí, eliminar'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmEliminar(false)}
+                                  className="flex-1 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </>
                       )}
