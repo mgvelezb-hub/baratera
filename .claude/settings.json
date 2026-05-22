@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/vpconsulting/Library/CloudStorage/OneDrive-VPConsulting/Coding/baratera/.claude/hooks/session-start.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

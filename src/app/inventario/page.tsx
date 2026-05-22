@@ -1,13 +1,10 @@
-import NavBar from '@/components/NavBar'
+import AppShell from '@/components/AppShell'
 import InventarioClient from './InventarioClient'
 
 export default function InventarioPage() {
   return (
-    <>
-      <NavBar />
-      <main>
-        <InventarioClient />
-      </main>
-    </>
+    <AppShell>
+      <InventarioClient />
+    </AppShell>
   )
 }

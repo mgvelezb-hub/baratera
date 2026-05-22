@@ -1,0 +1,151 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import {
+  Package, ShoppingCart, ClipboardList, Globe,
+  MessageCircle, Users, BarChart3, LogOut, Menu, X, Clock,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
+
+const MODULES = [
+  { id: 'inventario', label: 'Inventario',   href: '/inventario', icon: Package,       built: true  },
+  { id: 'venta',      label: 'Venta física', href: '/venta',      icon: ShoppingCart,  built: true  },
+  { id: 'pedidos',    label: 'Pedidos',       href: '/pedidos',    icon: ClipboardList, built: false },
+  { id: 'tienda',     label: 'Tienda online', href: '/tienda',     icon: Globe,         built: false },
+  { id: 'chatbot',    label: 'Chatbot',       href: '/chatbot',    icon: MessageCircle, built: false },
+  { id: 'clientes',   label: 'Clientes',      href: '/clientes',   icon: Users,         built: false },
+  { id: 'dashboard',  label: 'Dashboard',     href: '/dashboard',  icon: BarChart3,     built: false },
+]
+
+function NavContent({ onClose }: { onClose?: () => void }) {
+  const pathname = usePathname()
+  const router   = useRouter()
+
+  async function handleLogout() {
+    await createClient().auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  return (
+    <>
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {MODULES.map(mod => {
+          const Icon     = mod.icon
+          const isActive = pathname.startsWith(mod.href)
+
+          if (!mod.built) {
+            return (
+              <div
+                key={mod.id}
+                className="flex items-center gap-3 h-10 px-3 rounded-xl text-slate-400 select-none"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="text-sm flex-1">{mod.label}</span>
+                <span className="text-xs bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5" />
+                  Pronto
+                </span>
+              </div>
+            )
+          }
+
+          return (
+            <Link
+              key={mod.id}
+              href={mod.href}
+              onClick={onClose}
+              className={cn(
+                'flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-violet-50 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+              )}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {mod.label}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="p-3 border-t border-slate-200">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Cerrar sesión
+        </button>
+      </div>
+    </>
+  )
+}
+
+function LogoBlock() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center shrink-0">
+        <Package className="w-4 h-4 text-white" />
+      </div>
+      <div>
+        <p className="text-xs text-slate-400 leading-none">Papelería</p>
+        <p className="text-sm font-semibold text-slate-900 leading-tight">La Más Baratera</p>
+      </div>
+    </div>
+  )
+}
+
+export default function Sidebar() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      {/* ── Desktop sidebar ──────────────────────────────────── */}
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-slate-200 bg-white h-screen sticky top-0">
+        <div className="flex items-center h-14 px-4 border-b border-slate-200">
+          <LogoBlock />
+        </div>
+        <NavContent />
+      </aside>
+
+      {/* ── Mobile top bar ───────────────────────────────────── */}
+      <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200 flex items-center justify-between h-14 px-4">
+        <LogoBlock />
+        <button
+          onClick={() => setOpen(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-600"
+          aria-label="Abrir menú"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* ── Mobile drawer ────────────────────────────────────── */}
+      {open && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 z-50 bg-black/50"
+            onClick={() => setOpen(false)}
+          />
+          <aside className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-72 bg-white flex flex-col shadow-xl">
+            <div className="flex items-center justify-between h-14 px-4 border-b border-slate-200">
+              <LogoBlock />
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+                aria-label="Cerrar menú"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <NavContent onClose={() => setOpen(false)} />
+          </aside>
+        </>
+      )}
+    </>
+  )
+}

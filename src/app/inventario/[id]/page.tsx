@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Package } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import NavBar from '@/components/NavBar'
+import AppShell from '@/components/AppShell'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN, formatFecha } from '@/lib/utils'
 import SemaforoBadge from '@/components/Semaforobadge'
@@ -27,8 +27,7 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
   return (
-    <>
-      <NavBar />
+    <AppShell>
       <main className="max-w-3xl mx-auto px-4 py-6">
         {/* Back */}
         <Link href="/inventario" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
@@ -148,6 +147,6 @@ export default async function ProductoDetailPage({ params }: { params: Promise<{
           )}
         </div>
       </main>
-    </>
+    </AppShell>
   )
 }
