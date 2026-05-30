@@ -8,21 +8,23 @@ import {
   MessageCircle, Users, BarChart3, LogOut, Menu, X, Clock,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { cn } from '@/lib/utils'
 
 const MODULES = [
-  { id: 'inventario', label: 'Inventario',   href: '/inventario', icon: Package,       built: true  },
-  { id: 'venta',      label: 'Venta física', href: '/venta',      icon: ShoppingCart,  built: true  },
-  { id: 'pedidos',    label: 'Pedidos',       href: '/pedidos',    icon: ClipboardList, built: false },
-  { id: 'tienda',     label: 'Tienda online', href: '/tienda',     icon: Globe,         built: false },
-  { id: 'chatbot',    label: 'Chatbot',       href: '/chatbot',    icon: MessageCircle, built: false },
-  { id: 'clientes',   label: 'Clientes',      href: '/clientes',   icon: Users,         built: false },
-  { id: 'dashboard',  label: 'Dashboard',     href: '/dashboard',  icon: BarChart3,     built: false },
+  { id: 'inventario', label: 'Inventario',   href: '/inventario', icon: Package,       built: true,  adminOnly: false },
+  { id: 'venta',      label: 'Venta física', href: '/venta',      icon: ShoppingCart,  built: true,  adminOnly: false },
+  { id: 'pedidos',    label: 'Pedidos',       href: '/pedidos',    icon: ClipboardList, built: false, adminOnly: false },
+  { id: 'tienda',     label: 'Tienda online', href: '/tienda',     icon: Globe,         built: false, adminOnly: false },
+  { id: 'chatbot',    label: 'Chatbot',       href: '/chatbot',    icon: MessageCircle, built: false, adminOnly: false },
+  { id: 'clientes',   label: 'Clientes',      href: '/clientes',   icon: Users,         built: false, adminOnly: false },
+  { id: 'dashboard',  label: 'Dashboard',     href: '/dashboard',  icon: BarChart3,     built: true,  adminOnly: true  },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {
-  const pathname = usePathname()
-  const router   = useRouter()
+  const pathname      = usePathname()
+  const router        = useRouter()
+  const { isAdmin }   = useIsAdmin()
 
   async function handleLogout() {
     await createClient().auth.signOut()
@@ -33,7 +35,7 @@ function NavContent({ onClose }: { onClose?: () => void }) {
   return (
     <>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {MODULES.map(mod => {
+        {MODULES.filter(mod => !mod.adminOnly || isAdmin).map(mod => {
           const Icon     = mod.icon
           const isActive = pathname.startsWith(mod.href)
 
