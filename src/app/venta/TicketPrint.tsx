@@ -95,8 +95,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
       '─────────────────────────────',
       ...items.map(item => {
         const p: string[] = []
-        if (item.cantidadCajas  > 0) p.push(`${item.cantidadCajas} caja`)
-        if (item.cantidadPiezas > 0) p.push(`${item.cantidadPiezas} ${item.unidad}`)
+        if (item.cantidadCajas  > 0) p.push(`${item.cantidadCajas} cajas`)
+        if (item.cantidadPiezas > 0) p.push(`${item.cantidadPiezas} piezas`)
         return `${item.nombre}  (${p.join(' + ')})  ${formatMXN(item.subtotal)}`
       }),
       '─────────────────────────────',
@@ -162,8 +162,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
+              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} cajas`)
+              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} piezas`)
               return (
                 <div key={i} style={{ marginBottom: '4px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
