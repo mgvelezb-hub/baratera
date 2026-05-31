@@ -27,12 +27,12 @@ type Tab = 'imprimir' | 'correo' | 'telefono'
 // ── Print CSS — sin @page para que el driver use su tamaño
 // configurado y no haya mismatch ni errores de impresión.
 const PRINT_CSS = `
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; color: #000 !important; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 16px;
+    font-size: 15px;
     width: 54mm;
-    padding: 2mm 2mm 2mm 0mm;  /* sin margen izquierdo */
+    padding: 1mm 1mm 10mm 1mm;
     color: #000;
   }
   .titulo {
@@ -148,7 +148,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-11px'  }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: '1.5', color: '#000' }}
           >
             {/* Store name */}
             <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '20px', marginBottom: '2px' }}>
@@ -162,8 +162,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
+              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} cajas`)
+              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} piezas`)
               return (
                 <div key={i} style={{ marginBottom: '2px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
