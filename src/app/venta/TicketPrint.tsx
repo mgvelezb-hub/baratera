@@ -27,15 +27,11 @@ type Tab = 'imprimir' | 'correo' | 'telefono'
 // ── Print CSS — sin @page para que el driver use su tamaño
 // configurado y no haya mismatch ni errores de impresión.
 const PRINT_CSS = `
-  @page {
-    margin: 0;
-    size: 58mm auto;   /* auto = altura dinámica según contenido */
-  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 16px;
-    width: 54mm;       /* un poco menos que 58mm para dejar margen */
+    width: 54mm;
     padding: 2mm;
     color: #000;
   }
@@ -78,8 +74,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 </head><body>${content}</body></html>`)
     win.document.close()
     win.focus()
-    win.print()
-    win.close()
+    setTimeout(() => {
+      win.print()
+      win.close()
+    }, 500)
   }
 
   // ── Email via mailto: ────────────────────────────────────────
