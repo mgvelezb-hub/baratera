@@ -148,7 +148,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '13px', lineHeight: '1.5', color: '#000', paddingLeft: '0px' }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '13px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-8px'  }}
           >
             {/* Store name */}
             <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px', marginBottom: '2px' }}>
@@ -186,18 +186,18 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Payment breakdown */}
-            <Row style={{ fontSize: '10px', color: '#444' }}>
+            <Row style={{ fontSize: '10px', color: '#000' }}>
               <span>Forma de pago</span>
               <span>{metodoLabel}</span>
             </Row>
             {payment.montoEfectivo > 0 && (
-              <Row style={{ fontSize: '10px', color: '#444' }}>
+              <Row style={{ fontSize: '10px', color: '#000' }}>
                 <span>Efectivo</span>
                 <span>{formatMXN(payment.montoEfectivo)}</span>
               </Row>
             )}
             {payment.montoTarjeta > 0 && (
-              <Row style={{ fontSize: '10px', color: '#444' }}>
+              <Row style={{ fontSize: '10px', color: '#000' }}>
                 <span>Tarjeta</span>
                 <span>{formatMXN(payment.montoTarjeta)}</span>
               </Row>
@@ -210,8 +210,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             )}
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '10px', color: '#666' }}>¡Gracias por su compra!</p>
-            <p style={{ textAlign: 'center', fontSize: '10px', color: '#666' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#000' }}>¡Gracias por su compra!</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#000' }}>Vuelva pronto</p>
           </div>
         </div>
 
