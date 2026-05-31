@@ -32,8 +32,14 @@ const PRINT_CSS = `
     font-family: 'Courier New', Courier, monospace;
     font-size: 16px;
     width: 54mm;
-    padding: 2mm;
+    padding: 2mm 2mm 2mm 0mm;  /* sin margen izquierdo */
     color: #000;
+  }
+  .titulo {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4px;
   }
 `
 
@@ -142,10 +148,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11.5px', lineHeight: '1.5', color: '#000' }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '13px', lineHeight: '1.5', color: '#000', paddingLeft: '0px' }}
           >
             {/* Store name */}
-            <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', marginBottom: '2px' }}>
+            <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px', marginBottom: '2px' }}>
               Papelería La Más Baratera
             </p>
             <p style={{ textAlign: 'center', fontSize: '10px', color: '#666', marginBottom: '4px' }}>
