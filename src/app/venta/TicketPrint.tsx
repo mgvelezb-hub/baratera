@@ -27,12 +27,12 @@ type Tab = 'imprimir' | 'correo' | 'telefono'
 // ── Print CSS — sin @page para que el driver use su tamaño
 // configurado y no haya mismatch ni errores de impresión.
 const PRINT_CSS = `
-  * { margin: 0; padding: 0; box-sizing: border-box; color: #000 !important; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 15px;
+    font-size: 16px;
     width: 54mm;
-    padding: 1mm 1mm 10mm 1mm;
+    padding: 2mm 2mm 2mm 0mm;  /* sin margen izquierdo */
     color: #000;
   }
   .titulo {
@@ -148,13 +148,13 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: '1.5', color: '#000' }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '13px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-8px'  }}
           >
             {/* Store name */}
-            <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '20px', marginBottom: '2px' }}>
+            <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px', marginBottom: '2px' }}>
               Papelería La Más Baratera
             </p>
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#000', marginBottom: '4px' }}>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#666', marginBottom: '4px' }}>
               {hora}
             </p>
             <Divider />
@@ -162,13 +162,13 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} cajas`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} piezas`)
+              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja`)
+              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
               return (
-                <div key={i} style={{ marginBottom: '2px' }}>
+                <div key={i} style={{ marginBottom: '4px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
-                    <span style={{ fontSize: '12px', color: '#000' }}>{parts.join(' + ')}</span>
+                    <span style={{ fontSize: '10px', color: '#666' }}>{parts.join(' + ')}</span>
                     <span>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>
@@ -178,7 +178,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Total */}
-            <Row style={{ fontSize: '15px', fontWeight: 'bold' }}>
+            <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
               <span>{formatMXN(total)}</span>
             </Row>
@@ -186,32 +186,32 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Payment breakdown */}
-            <Row style={{ fontSize: '12px', color: '#000' }}>
+            <Row style={{ fontSize: '10px', color: '#000' }}>
               <span>Forma de pago</span>
               <span>{metodoLabel}</span>
             </Row>
             {payment.montoEfectivo > 0 && (
-              <Row style={{ fontSize: '12px', color: '#000' }}>
+              <Row style={{ fontSize: '10px', color: '#000' }}>
                 <span>Efectivo</span>
                 <span>{formatMXN(payment.montoEfectivo)}</span>
               </Row>
             )}
             {payment.montoTarjeta > 0 && (
-              <Row style={{ fontSize: '12px', color: '#000' }}>
+              <Row style={{ fontSize: '10px', color: '#000' }}>
                 <span>Tarjeta</span>
                 <span>{formatMXN(payment.montoTarjeta)}</span>
               </Row>
             )}
             {payment.cambio > 0 && (
-              <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
+              <Row style={{ fontSize: '11px', fontWeight: 'bold' }}>
                 <span>Cambio</span>
                 <span>{formatMXN(payment.cambio)}</span>
               </Row>
             )}
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#000' }}>¡Gracias por su compra!</p>
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#000' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#000' }}>¡Gracias por su compra!</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#000' }}>Vuelva pronto</p>
           </div>
         </div>
 
