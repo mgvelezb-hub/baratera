@@ -354,7 +354,10 @@ export default function VentaClient() {
   const [confirmando,  setConfirmando]  = useState(false)
   const [ventaExitosa, setVentaExitosa] = useState<VentaExitosa | null>(null)
   const [error,        setError]        = useState('')
-  const channelRef = useRef<BroadcastChannel | null>(null)
+  const channelRef      = useRef<BroadcastChannel | null>(null)
+  // Prevents the cart-empty effect from overwriting the 'complete'
+  // screen on the customer display right after a sale is confirmed.
+  const saleJustDoneRef = useRef(false)
 
   // Open/close BroadcastChannel for customer display
   useEffect(() => {
@@ -366,6 +369,9 @@ export default function VentaClient() {
   useEffect(() => {
     const ch = channelRef.current
     if (!ch) return
+    // Hold the 'complete' screen until the cashier explicitly
+    // starts a new sale (saleJustDoneRef is cleared in resetDisplay)
+    if (saleJustDoneRef.current) return
     if (carrito.length === 0) {
       ch.postMessage({ screen: 'idle' })
     } else {
@@ -517,11 +523,23 @@ export default function VentaClient() {
       cambio: payment.cambio,
     })
 
+    // Block the cart effect from sending 'idle' while the
+    // customer display shows the 'complete' screen.
+    saleJustDoneRef.current = true
     setVentaExitosa({ items: [...carrito], total: ventaTotal, hora, payment })
     setCarrito([])
     setShowPayment(false)
     setConfirmando(false)
     fetchProductos()
+  }
+
+  // Called by both "Nueva venta" and "Cerrar" in TicketPrint —
+  // releases the display back to idle.
+  function resetDisplay() {
+    saleJustDoneRef.current = false
+    channelRef.current?.postMessage({ screen: 'idle' })
+    setVentaExitosa(null)
+    setShowCarrito(false)
   }
 
   const totalProductos = carrito.length
@@ -700,8 +718,8 @@ export default function VentaClient() {
         total={ventaExitosa.total}
         payment={ventaExitosa.payment}
         hora={ventaExitosa.hora}
-        onClose={() => setVentaExitosa(null)}
-        onNuevaVenta={() => { setVentaExitosa(null); setShowCarrito(false) }}
+        onClose={resetDisplay}
+        onNuevaVenta={resetDisplay}
       />
     )}
     </>
