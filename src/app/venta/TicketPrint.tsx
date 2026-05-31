@@ -148,7 +148,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-20px'  }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-13px'  }}
           >
             {/* Store name */}
             <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '20px', marginBottom: '2px' }}>
