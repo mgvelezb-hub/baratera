@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Search, Plus, Minus, ShoppingCart, X, CheckCircle2,
-  Package, Loader2, AlertTriangle, ChevronRight,
+  Package, Loader2, AlertTriangle, ChevronRight, Monitor,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
+import PaymentModal, { type PaymentData } from './PaymentModal'
+import TicketPrint, { type TicketItem } from './TicketPrint'
 
 // ── Types ──────────────────────────────────────────────────────
 interface CartItem {
@@ -18,9 +20,10 @@ interface CartItem {
 }
 
 interface VentaExitosa {
-  items: CartItem[]
-  total: number
-  hora: string
+  items:   CartItem[]
+  total:   number
+  hora:    string
+  payment: PaymentData
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -54,6 +57,16 @@ function maxCajas(p: Producto): number {
 
 function maxPiezas(item: CartItem): number {
   return item.producto.stock_fisico - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
+}
+
+function toTicketItems(items: CartItem[]): TicketItem[] {
+  return items.map(item => ({
+    nombre:         item.producto.nombre,
+    cantidadCajas:  item.cantidadCajas,
+    cantidadPiezas: item.cantidadPiezas,
+    unidad:         item.producto.unidad,
+    subtotal:       subtotalItem(item),
+  }))
 }
 
 // ── Product card ───────────────────────────────────────────────
@@ -330,47 +343,6 @@ function CarritoPanel({
   )
 }
 
-// ── Success screen ─────────────────────────────────────────────
-function VentaExitosaScreen({ venta, onNuevaVenta }: { venta: VentaExitosa; onNuevaVenta: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full py-16 px-8 text-center">
-      <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-5">
-        <CheckCircle2 className="w-10 h-10 text-green-600" />
-      </div>
-      <h2 className="text-xl font-bold text-slate-900 mb-1">¡Venta registrada!</h2>
-      <p className="text-sm text-slate-500 mb-6">{venta.hora}</p>
-
-      <div className="w-full max-w-xs bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100 mb-6 text-left overflow-hidden">
-        {venta.items.map(item => {
-          const parts: string[] = []
-          if (item.cantidadCajas > 0) parts.push(`${item.cantidadCajas} caja(s)`)
-          if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.producto.unidad}`)
-          return (
-            <div key={item.producto.id} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-slate-900 line-clamp-1">{item.producto.nombre}</p>
-                <p className="text-xs text-slate-400">× {parts.join(' + ')}</p>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">{formatMXN(subtotalItem(item))}</p>
-            </div>
-          )
-        })}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-50">
-          <span className="text-sm font-semibold text-slate-700">Total</span>
-          <span className="text-base font-bold text-slate-900">{formatMXN(venta.total)}</span>
-        </div>
-      </div>
-
-      <button
-        onClick={onNuevaVenta}
-        className="h-12 px-8 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition-colors"
-      >
-        Nueva venta
-      </button>
-    </div>
-  )
-}
-
 // ── Main ───────────────────────────────────────────────────────
 export default function VentaClient() {
   const [productos,    setProductos]    = useState<Producto[]>([])
@@ -378,9 +350,32 @@ export default function VentaClient() {
   const [search,       setSearch]       = useState('')
   const [carrito,      setCarrito]      = useState<CartItem[]>([])
   const [showCarrito,  setShowCarrito]  = useState(false)
+  const [showPayment,  setShowPayment]  = useState(false)
   const [confirmando,  setConfirmando]  = useState(false)
   const [ventaExitosa, setVentaExitosa] = useState<VentaExitosa | null>(null)
   const [error,        setError]        = useState('')
+  const channelRef = useRef<BroadcastChannel | null>(null)
+
+  // Open/close BroadcastChannel for customer display
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel('baratera-pos')
+    return () => channelRef.current?.close()
+  }, [])
+
+  // Sync cart to customer display on every change
+  useEffect(() => {
+    const ch = channelRef.current
+    if (!ch) return
+    if (carrito.length === 0) {
+      ch.postMessage({ screen: 'idle' })
+    } else {
+      ch.postMessage({
+        screen: 'cart',
+        items:  toTicketItems(carrito),
+        total:  totalCarrito(carrito),
+      })
+    }
+  }, [carrito])
 
   const fetchProductos = useCallback(async () => {
     const { data } = await createClient()
@@ -457,18 +452,19 @@ export default function VentaClient() {
     setCarrito(prev => prev.filter(i => i.producto.id !== productoId))
   }
 
-  async function confirmarVenta() {
+  async function confirmarVenta(payment: PaymentData) {
     if (carrito.length === 0) return
     setConfirmando(true)
     setError('')
 
-    const supabase          = createClient()
+    const supabase           = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const { data: actuales } = await supabase
       .from('productos')
       .select('id, stock_fisico, nombre')
       .in('id', carrito.map(i => i.producto.id))
 
+    // Stock validation
     for (const item of carrito) {
       const actual = actuales?.find(p => p.id === item.producto.id)
       const piezas = piezasReales(item)
@@ -479,22 +475,29 @@ export default function VentaClient() {
       }
     }
 
+    // Tell display: payment processing
+    channelRef.current?.postMessage({
+      screen: 'payment',
+      total:  totalCarrito(carrito),
+      metodo: payment.metodo,
+    })
+
+    // Write ledger + update stock
     for (const item of carrito) {
       const actual     = actuales!.find(p => p.id === item.producto.id)!
       const piezas     = piezasReales(item)
       const nuevoStock = actual.stock_fisico - piezas
 
       const parts: string[] = []
-      if (item.cantidadCajas > 0) parts.push(`${item.cantidadCajas} caja(s)`)
+      if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja(s)`)
       if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.producto.unidad}`)
-      const modoLabel = parts.join(' + ')
 
       await supabase.from('stock_ledger').insert({
         producto_id: item.producto.id,
         tipo:        'salida_venta_manual',
         qty_antes:   actual.stock_fisico,
         qty_despues: nuevoStock,
-        notas:       `[pos] ${modoLabel} · ${user?.email ?? 'desconocido'}`,
+        notas:       `[pos] ${parts.join(' + ')} · ${payment.metodo} · ${user?.email ?? 'desconocido'}`,
         canal:       'pos',
         usuario_id:  user?.id ?? null,
       })
@@ -502,12 +505,21 @@ export default function VentaClient() {
       await supabase.from('productos').update({ stock_fisico: nuevoStock }).eq('id', item.producto.id)
     }
 
-    setVentaExitosa({
-      items: [...carrito],
-      total: totalCarrito(carrito),
-      hora:  new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
+    const ventaTotal = totalCarrito(carrito)
+    const hora       = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+    // Tell display: sale complete
+    channelRef.current?.postMessage({
+      screen: 'complete',
+      items:  toTicketItems(carrito),
+      total:  ventaTotal,
+      metodo: payment.metodo,
+      cambio: payment.cambio,
     })
+
+    setVentaExitosa({ items: [...carrito], total: ventaTotal, hora, payment })
     setCarrito([])
+    setShowPayment(false)
     setConfirmando(false)
     fetchProductos()
   }
@@ -515,15 +527,8 @@ export default function VentaClient() {
   const totalProductos = carrito.length
   const total          = totalCarrito(carrito)
 
-  if (ventaExitosa) {
-    return (
-      <div className="flex-1 lg:h-full">
-        <VentaExitosaScreen venta={ventaExitosa} onNuevaVenta={() => setVentaExitosa(null)} />
-      </div>
-    )
-  }
-
   return (
+    <>
     <div className="flex flex-col lg:flex-row lg:h-full">
 
       {/* ── Product area ────────────────────────────────────── */}
@@ -582,11 +587,20 @@ export default function VentaClient() {
               </span>
             )}
           </div>
-          {carrito.length > 0 && (
-            <button onClick={() => setCarrito([])} className="text-xs text-slate-400 hover:text-slate-600">
-              Limpiar
+          <div className="flex items-center gap-2">
+            {carrito.length > 0 && (
+              <button onClick={() => setCarrito([])} className="text-xs text-slate-400 hover:text-slate-600">
+                Limpiar
+              </button>
+            )}
+            <button
+              onClick={() => window.open('/venta/display', '_blank')}
+              title="Abrir pantalla cliente"
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <Monitor className="w-4 h-4" />
             </button>
-          )}
+          </div>
         </div>
 
         {error && (
@@ -600,7 +614,7 @@ export default function VentaClient() {
           onSetCajas={setCantidadCajas}
           onSetPiezas={setCantidadPiezas}
           onEliminar={eliminarDelCarrito}
-          onConfirmar={confirmarVenta}
+          onConfirmar={() => setShowPayment(true)}
           confirmando={confirmando}
         />
       </div>
@@ -661,12 +675,35 @@ export default function VentaClient() {
               onSetCajas={setCantidadCajas}
               onSetPiezas={setCantidadPiezas}
               onEliminar={eliminarDelCarrito}
-              onConfirmar={async () => { await confirmarVenta(); setShowCarrito(false) }}
+              onConfirmar={() => { setShowPayment(true); setShowCarrito(false) }}
               confirmando={confirmando}
             />
           </div>
         </>
       )}
     </div>
+
+    {/* ── Payment modal ────────────────────────────────────── */}
+    {showPayment && (
+      <PaymentModal
+        total={total}
+        confirmando={confirmando}
+        onCancel={() => setShowPayment(false)}
+        onConfirmar={confirmarVenta}
+      />
+    )}
+
+    {/* ── Ticket after sale ────────────────────────────────── */}
+    {ventaExitosa && (
+      <TicketPrint
+        items={toTicketItems(ventaExitosa.items)}
+        total={ventaExitosa.total}
+        payment={ventaExitosa.payment}
+        hora={ventaExitosa.hora}
+        onClose={() => setVentaExitosa(null)}
+        onNuevaVenta={() => { setVentaExitosa(null); setShowCarrito(false) }}
+      />
+    )}
+    </>
   )
 }

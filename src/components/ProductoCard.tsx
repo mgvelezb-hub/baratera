@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
+import { MoreVertical, Plus, Pencil } from 'lucide-react'
 import type { Producto } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
 import EditarProductoModal from '@/app/inventario/EditarProductoModal'
@@ -18,24 +17,13 @@ interface Props {
 }
 
 export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
-  const [showMenu,      setShowMenu]      = useState(false)
-  const [confirmDesact, setConfirmDesact] = useState(false)
-  const [loading,       setLoading]       = useState(false)
-  const [showEditar,      setShowEditar]       = useState(false)
-  const [modalTipo,       setModalTipo]        = useState<'entrada_compra' | null>(null)
+  const [showMenu,  setShowMenu]  = useState(false)
+  const [showEditar, setShowEditar] = useState(false)
+  const [modalTipo,  setModalTipo]  = useState<'entrada_compra' | null>(null)
 
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
-  async function handleDesactivar() {
-    setLoading(true)
-    await createClient().from('productos').update({ activo: false }).eq('id', producto.id)
-    setLoading(false)
-    setShowMenu(false)
-    setConfirmDesact(false)
-    onRefresh()
-  }
-
-function handleMovimientoSuccess() {
+  function handleMovimientoSuccess() {
     setModalTipo(null)
     onRefresh()
   }
@@ -100,36 +88,6 @@ function handleMovimientoSuccess() {
                             <Pencil className="w-4 h-4 text-violet-500" />
                             Editar producto
                           </button>
-                          <hr className="my-1 border-slate-100" />
-                          {!confirmDesact && (
-                            <button
-                              onClick={() => setConfirmDesact(true)}
-                              className="w-full h-9 px-3 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Desactivar producto
-                            </button>
-                          )}
-                          {confirmDesact && (
-                            <div className="px-3 py-2">
-                              <p className="text-xs text-slate-500 mb-2">¿Desactivar este producto?</p>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={handleDesactivar}
-                                  disabled={loading}
-                                  className="flex-1 h-7 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-xs font-semibold rounded-lg transition-colors"
-                                >
-                                  {loading ? '...' : 'Sí, desactivar'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDesact(false)}
-                                  className="flex-1 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
-                                >
-                                  Cancelar
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </>
                       )}
                     </div>

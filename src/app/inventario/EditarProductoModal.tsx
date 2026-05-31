@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Trash2, AlertOctagon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto } from '@/lib/types'
 
@@ -15,8 +15,11 @@ interface Props {
 }
 
 export default function EditarProductoModal({ producto, onClose, onSuccess }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState('')
+  const [confirmDesact,   setConfirmDesact]   = useState(false)
+  const [confirmEliminar, setConfirmEliminar] = useState(false)
+  const [dangerLoading,   setDangerLoading]   = useState(false)
 
   const [form, setForm] = useState({
     nombre:          producto.nombre,
@@ -74,6 +77,20 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       return
     }
 
+    onSuccess()
+  }
+
+  async function handleDesactivar() {
+    setDangerLoading(true)
+    await createClient().from('productos').update({ activo: false }).eq('id', producto.id)
+    onSuccess()
+  }
+
+  async function handleEliminar() {
+    setDangerLoading(true)
+    const supabase = createClient()
+    await supabase.from('stock_ledger').delete().eq('producto_id', producto.id)
+    await supabase.from('productos').delete().eq('id', producto.id)
     onSuccess()
   }
 
@@ -258,6 +275,85 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Guardando...' : 'Guardar cambios'}
             </button>
+          </div>
+
+          {/* ── Danger zone ───────────────────────────────── */}
+          <div className="border-t border-red-100 pt-5 space-y-3">
+            <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">Zona de riesgo</p>
+
+            {/* Desactivar */}
+            {!confirmDesact && !confirmEliminar && (
+              <button
+                type="button"
+                onClick={() => setConfirmDesact(true)}
+                className="w-full h-10 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Desactivar producto
+              </button>
+            )}
+            {confirmDesact && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-red-800 mb-1">¿Desactivar este producto?</p>
+                <p className="text-xs text-red-600 mb-3">
+                  Dejará de aparecer en el inventario. El historial se conserva.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDesactivar}
+                    disabled={dangerLoading}
+                    className="flex-1 h-10 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    {dangerLoading ? 'Desactivando...' : 'Sí, desactivar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDesact(false)}
+                    className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Eliminar permanentemente */}
+            {!confirmDesact && !confirmEliminar && (
+              <button
+                type="button"
+                onClick={() => setConfirmEliminar(true)}
+                className="w-full h-10 border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+              >
+                <AlertOctagon className="w-4 h-4" />
+                Eliminar permanentemente
+              </button>
+            )}
+            {confirmEliminar && (
+              <div className="bg-red-50 border-2 border-red-400 rounded-xl p-4">
+                <p className="text-sm font-bold text-red-900 mb-1">¿Eliminar permanentemente?</p>
+                <p className="text-xs text-red-700 mb-3">
+                  Se borrarán el producto y <span className="font-semibold">todo su historial</span>. Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleEliminar}
+                    disabled={dangerLoading}
+                    className="flex-1 h-10 bg-red-700 hover:bg-red-800 disabled:bg-red-400 text-white text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    {dangerLoading ? 'Eliminando...' : 'Sí, eliminar todo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmEliminar(false)}
+                    className="flex-1 h-10 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </form>
       </div>
