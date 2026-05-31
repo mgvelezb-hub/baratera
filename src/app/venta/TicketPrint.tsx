@@ -61,9 +61,12 @@ function Divider() {
 
 export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
-  const [tab,      setTab]      = useState<Tab>('imprimir')
-  const [email,    setEmail]    = useState('')
-  const [telefono, setTelefono] = useState('')
+  const [tab,          setTab]          = useState<Tab>('imprimir')
+  const [email,        setEmail]        = useState('')
+  const [telefono,     setTelefono]     = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailSent,    setEmailSent]    = useState(false)
+  const [emailError,   setEmailError]   = useState('')
 
   const metodoLabel = payment.metodo === 'efectivo' ? 'Efectivo'
     : payment.metodo === 'tarjeta' ? 'Tarjeta' : 'Efectivo + Tarjeta'
@@ -86,31 +89,35 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     }, 500)
   }
 
-  // ── Email via mailto: ────────────────────────────────────────
-  function handleEmail() {
-    if (!email.trim()) return
-    const lines = [
-      'Papelería La Más Baratera',
-      `Hora: ${hora}`,
-      '─────────────────────────────',
-      ...items.map(item => {
-        const p: string[] = []
-        if (item.cantidadCajas  > 0) p.push(`${item.cantidadCajas} cajas`)
-        if (item.cantidadPiezas > 0) p.push(`${item.cantidadPiezas} piezas`)
-        return `${item.nombre}  (${p.join(' + ')})  ${formatMXN(item.subtotal)}`
-      }),
-      '─────────────────────────────',
-      `TOTAL: ${formatMXN(total)}`,
-      `Forma de pago: ${metodoLabel}`,
-      ...(payment.montoEfectivo > 0 ? [`Efectivo: ${formatMXN(payment.montoEfectivo)}`] : []),
-      ...(payment.montoTarjeta  > 0 ? [`Tarjeta:  ${formatMXN(payment.montoTarjeta)}`]  : []),
-      ...(payment.cambio        > 0 ? [`Cambio:   ${formatMXN(payment.cambio)}`]         : []),
-      '',
-      '¡Gracias por su compra! Vuelva pronto.',
-    ]
-    const subj = encodeURIComponent('Ticket de compra — Papelería La Más Baratera')
-    const body = encodeURIComponent(lines.join('\n'))
-    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${subj}&body=${body}`
+  // ── Email via Resend API ─────────────────────────────────────
+  async function handleEmail() {
+    if (!email.trim() || emailSending) return
+    setEmailSending(true)
+    setEmailError('')
+    try {
+      const res = await fetch('/api/send-ticket', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          email,
+          items,
+          total,
+          hora,
+          metodo:        payment.metodo,
+          montoEfectivo: payment.montoEfectivo,
+          montoTarjeta:  payment.montoTarjeta,
+          cambio:        payment.cambio,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Error al enviar')
+      setEmailSent(true)
+      setEmail('')
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Error al enviar')
+    } finally {
+      setEmailSending(false)
+    }
   }
 
   // ── SMS via sms: ─────────────────────────────────────────────
@@ -249,22 +256,33 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
           {/* Correo */}
           {tab === 'correo' && (
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleEmail()}
-                placeholder="correo@ejemplo.com"
-                className="flex-1 h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
-              <button
-                onClick={handleEmail}
-                disabled={!email.trim()}
-                className="h-11 px-4 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold rounded-xl transition-colors"
-              >
-                Enviar
-              </button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setEmailSent(false); setEmailError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleEmail()}
+                  placeholder="correo@ejemplo.com"
+                  disabled={emailSending}
+                  className="flex-1 h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-50"
+                />
+                <button
+                  onClick={handleEmail}
+                  disabled={!email.trim() || emailSending}
+                  className="h-11 px-4 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold rounded-xl transition-colors min-w-[80px]"
+                >
+                  {emailSending ? '...' : 'Enviar'}
+                </button>
+              </div>
+              {emailSent && (
+                <p className="text-xs text-green-600 font-medium text-center">
+                  ✓ Ticket enviado correctamente
+                </p>
+              )}
+              {emailError && (
+                <p className="text-xs text-red-500 text-center">{emailError}</p>
+              )}
             </div>
           )}
 
