@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-const transporter = nodemailer.createTransport({
-  host:   'smtp.gmail.com',
-  port:   587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASS,
-  },
-})
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 interface TicketItem {
   nombre:         string
@@ -79,9 +71,11 @@ export async function POST(req: NextRequest) {
       </table>
     </div>
 
-    <div style="padding:16px 24px;background:#faf5ff;margin:16px 24px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:16px;color:#6b21a8;font-weight:600;">TOTAL</span>
-      <span style="font-size:24px;color:#7c3aed;font-weight:700;">${formatMXN(total)}</span>
+    <div style="padding:16px 24px;background:#faf5ff;margin:16px 24px;border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:16px;color:#6b21a8;font-weight:600;">TOTAL</span>
+        <span style="font-size:24px;color:#7c3aed;font-weight:700;">${formatMXN(total)}</span>
+      </div>
     </div>
 
     <div style="padding:0 24px 24px;">
@@ -99,12 +93,18 @@ export async function POST(req: NextRequest) {
 </html>`
 
   try {
-    await transporter.sendMail({
-      from:    `"Papelería La Más Baratera" <${process.env.GMAIL_USER}>`,
+    const { error } = await resend.emails.send({
+      from:    'Papelería La Más Baratera <onboarding@resend.dev>',
       to:      email,
       subject: `Tu ticket de compra — ${hora}`,
       html,
     })
+
+    if (error) {
+      console.error('Resend error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('send-ticket error:', err)
