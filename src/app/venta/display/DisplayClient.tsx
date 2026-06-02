@@ -106,7 +106,7 @@ export default function DisplayClient() {
     <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-green-700 to-green-600 text-white select-none">
       <CheckCircle2 className="w-28 h-28 text-green-200 mb-8" />
       <h1 className="text-6xl font-bold mb-4">¡Gracias por tu compra!</h1>
-      <p className="text-green-200 text-2xl">¡Regresa pronto!</p>
+      <p className="text-green-200 text-2xl">¡Regresa pronto! · ¡Bendiciones!</p>
     </div>
   )
 }
