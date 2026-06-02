@@ -481,13 +481,6 @@ export default function VentaClient() {
       }
     }
 
-    // Tell display: payment processing
-    channelRef.current?.postMessage({
-      screen: 'payment',
-      total:  totalCarrito(carrito),
-      metodo: payment.metodo,
-    })
-
     // Write ledger + update stock
     for (const item of carrito) {
       const actual     = actuales!.find(p => p.id === item.producto.id)!

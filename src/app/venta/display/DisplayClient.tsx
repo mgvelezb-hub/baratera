@@ -15,7 +15,6 @@ export interface DisplayItem {
 type DisplayState =
   | { screen: 'idle' }
   | { screen: 'cart';     items: DisplayItem[]; total: number }
-  | { screen: 'payment';  total: number; metodo: string }
   | { screen: 'complete'; items: DisplayItem[]; total: number; metodo: string; cambio: number }
 
 export default function DisplayClient() {
@@ -80,23 +79,6 @@ export default function DisplayClient() {
           <span className="text-xl text-slate-600 font-medium">Total</span>
           <span className="text-5xl font-bold text-violet-700">{formatMXN(state.total)}</span>
         </div>
-      </div>
-    )
-  }
-
-  // ── Payment ───────────────────────────────────────────────
-  if (state.screen === 'payment') {
-    const metodoLabel = state.metodo === 'efectivo' ? 'Efectivo'
-      : state.metodo === 'tarjeta' ? 'Tarjeta'
-      : 'Efectivo + Tarjeta'
-
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none">
-        <p className="text-slate-400 text-lg mb-4">Total a pagar</p>
-        <p className="text-8xl font-bold text-white mb-8">{formatMXN(state.total)}</p>
-        <span className="bg-violet-600 text-white px-6 py-2 rounded-full text-base font-semibold">
-          {metodoLabel}
-        </span>
       </div>
     )
   }
