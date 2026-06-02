@@ -2,10 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/AppShell'
 import SalesChart from './SalesChart'
 import type { ChartDay } from './SalesChart'
-import { calcularSemaforo } from '@/lib/types'
+import { calcularSemaforo, costoMensual, CATEGORIA_META } from '@/lib/types'
+import type { CostoFijo, CostoCategoria } from '@/lib/types'
 import {
   TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight,
-  ShoppingCart, Zap, Monitor, Globe, Clock, RefreshCcw,
+  ShoppingCart, Zap, Monitor, Globe, RefreshCcw,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -63,6 +64,8 @@ export default async function DashboardPage() {
   const sevenAgo    = new Date(now.getTime() -  7 * 86_400_000).toISOString()
   const fourteenAgo = new Date(now.getTime() - 14 * 86_400_000).toISOString()
 
+  const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
   const [
     { data: ventasHoy },
     { data: entradasHoy },
@@ -70,6 +73,9 @@ export default async function DashboardPage() {
     { data: ventasAnterior },
     { data: productos },
     { data: movimientos },
+    { data: adeudosPendientes },
+    { data: costosFijos },
+    { data: comprasMes },
   ] = await Promise.all([
     supabase.from('stock_ledger')
       .select('qty_antes, qty_despues, productos(precio_menudeo)')
@@ -88,6 +94,16 @@ export default async function DashboardPage() {
     supabase.from('stock_ledger')
       .select('id, tipo, qty_antes, qty_despues, notas, canal, created_at, productos(nombre, unidad)')
       .order('created_at', { ascending: false }).limit(12),
+    supabase.from('adeudos')
+      .select('id, monto, fecha_vencimiento, estado, descripcion, proveedores(nombre)')
+      .eq('estado', 'pendiente')
+      .order('fecha_vencimiento', { ascending: true })
+      .limit(4),
+    supabase.from('costos_fijos').select('*').eq('activo', true),
+    supabase.from('stock_ledger')
+      .select('qty_antes, qty_despues, productos(precio_menudeo)')
+      .eq('tipo', 'entrada_compra')
+      .gte('created_at', mesInicio),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
@@ -135,6 +151,51 @@ export default async function DashboardPage() {
   }
   const topMovers = [...movsByProd.values()].sort((a, b) => b.piezas - a.piezas).slice(0, 6)
 
+  // ── Adeudos calculations ──────────────────────────────────
+  function diasParaVencer(fecha: string): number {
+    const hoy  = new Date(); hoy.setHours(0, 0, 0, 0)
+    const venc = new Date(fecha + 'T00:00:00')
+    return Math.ceil((venc.getTime() - hoy.getTime()) / 86_400_000)
+  }
+
+  const totalAdeudado   = (adeudosPendientes ?? []).reduce((s, a) => s + Number(a.monto), 0)
+  const adeudosVencidos = (adeudosPendientes ?? []).filter(a => diasParaVencer(a.fecha_vencimiento) < 0)
+  const adeudosUrgentes = (adeudosPendientes ?? []).filter(a => { const d = diasParaVencer(a.fecha_vencimiento); return d >= 0 && d <= 3 })
+
+  // ── Costos donut ──────────────────────────────────────────
+  const costoMercancia = (comprasMes ?? []).reduce((s: number, r: any) => {
+    return s + Math.max(0, r.qty_despues - r.qty_antes) * Number(r.productos?.precio_menudeo ?? 0)
+  }, 0)
+
+  const totalPorCat: Partial<Record<CostoCategoria, number>> = {}
+  for (const c of (costosFijos ?? []) as CostoFijo[]) {
+    totalPorCat[c.categoria] = (totalPorCat[c.categoria] ?? 0) + costoMensual(c)
+  }
+  const totalFijos   = Object.values(totalPorCat).reduce((s, v) => s + v, 0)
+  const totalCostos  = totalFijos + costoMercancia
+  const CIRCUM       = 2 * Math.PI * 38
+
+  const donutSegs = (() => {
+    const base = [
+      { label: 'Mercancía', value: costoMercancia,  color: '#7c3aed' },
+      ...Object.entries(totalPorCat)
+        .filter(([, v]) => (v ?? 0) > 0)
+        .map(([cat, val]) => ({
+          label: CATEGORIA_META[cat as CostoCategoria].label,
+          value: val ?? 0,
+          color: CATEGORIA_META[cat as CostoCategoria].color,
+        })),
+    ].filter(s => s.value > 0)
+    let offset = 0
+    return base.map(s => {
+      const pct  = totalCostos > 0 ? s.value / totalCostos : 0
+      const dash = pct * CIRCUM
+      const seg  = { ...s, pct: Math.round(pct * 100), dash, offset: -offset }
+      offset += dash
+      return seg
+    })
+  })()
+
   // ── Alerts ────────────────────────────────────────────────
   type AlertItem = { level: 'danger' | 'warn' | 'info'; title: string; body: string }
   const alerts: AlertItem[] = []
@@ -154,13 +215,18 @@ export default async function DashboardPage() {
     })
   }
   if (alerts.length === 0) {
-    alerts.push({ level: 'info', title: 'Todo en orden', body: 'Ningún producto bajo stock mínimo.' })
+    alerts.push({ level: 'info', title: 'Stock en orden', body: 'Ningún producto bajo stock mínimo.' })
   }
-  alerts.push({
-    level: 'info',
-    title: 'Alertas de pagos y proveedores',
-    body:  'Próximamente: vencimientos y adeudos activos.',
-  })
+  // Alertas de adeudos
+  for (const a of adeudosVencidos.slice(0, 2)) {
+    const prov = (a as any).proveedores?.nombre ?? 'Proveedor'
+    alerts.push({ level: 'danger', title: `Adeudo vencido: ${prov}`, body: `${formatMXNFull(Number(a.monto))} · ${a.descripcion}` })
+  }
+  for (const a of adeudosUrgentes.slice(0, 2)) {
+    const prov = (a as any).proveedores?.nombre ?? 'Proveedor'
+    const dias = diasParaVencer(a.fecha_vencimiento)
+    alerts.push({ level: 'warn', title: `Pago en ${dias} días: ${prov}`, body: `${formatMXNFull(Number(a.monto))} · ${a.descripcion}` })
+  }
 
   const fechaLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -325,74 +391,51 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* Cost structure donut (placeholder) */}
+          {/* Cost structure donut — datos reales */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <p className="text-sm font-semibold text-slate-700">Estructura de Costos</p>
-              <p className="text-xs text-slate-400 mt-0.5">Configura costos fijos para activar</p>
-            </div>
-            <div className="flex items-center gap-4 p-5">
-              {/* Donut SVG — placeholder values */}
-              <svg viewBox="0 0 110 110" width={100} height={100} className="shrink-0">
-                <circle cx="55" cy="55" r="38" fill="none" stroke="#f1f5f9" strokeWidth="16" />
-                {/* Mercancía 52% */}
-                <circle cx="55" cy="55" r="38" fill="none" stroke="#7c3aed" strokeWidth="16"
-                  strokeDasharray="124 115" strokeDashoffset="0" strokeLinecap="butt"
-                  transform="rotate(-90 55 55)" />
-                {/* Personal 20% */}
-                <circle cx="55" cy="55" r="38" fill="none" stroke="#8b5cf6" strokeWidth="16"
-                  strokeDasharray="48 191" strokeDashoffset="-124" strokeLinecap="butt"
-                  transform="rotate(-90 55 55)" />
-                {/* Renta 18% */}
-                <circle cx="55" cy="55" r="38" fill="none" stroke="#a78bfa" strokeWidth="16"
-                  strokeDasharray="43 196" strokeDashoffset="-172" strokeLinecap="butt"
-                  transform="rotate(-90 55 55)" />
-                {/* Otros 10% */}
-                <circle cx="55" cy="55" r="38" fill="none" stroke="#c4b5fd" strokeWidth="16"
-                  strokeDasharray="24 215" strokeDashoffset="-215" strokeLinecap="butt"
-                  transform="rotate(-90 55 55)" />
-                <text x="55" y="51" textAnchor="middle" fill="#1e293b" fontSize="12" fontWeight="600">62%</text>
-                <text x="55" y="63" textAnchor="middle" fill="#94a3b8" fontSize="8">costos</text>
-              </svg>
-              <div className="flex flex-col gap-2.5 flex-1">
-                {[
-                  { label: 'Mercancía',  pct: '52%', color: '#7c3aed' },
-                  { label: 'Personal',   pct: '20%', color: '#8b5cf6' },
-                  { label: 'Renta',      pct: '18%', color: '#a78bfa' },
-                  { label: 'Otros',      pct: '10%', color: '#c4b5fd' },
-                ].map(({ label, pct, color }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-                      <span className="text-xs text-slate-600">{label}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-700 font-mono">{pct}</span>
-                  </div>
-                ))}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Estructura de Costos</p>
+                <p className="text-xs text-slate-400 mt-0.5">Este mes</p>
               </div>
+              <Link href="/costos" className="text-xs text-violet-600 font-medium hover:underline">Gestionar →</Link>
             </div>
-            {/* Category margins */}
-            <div className="px-5 pb-4 space-y-2 border-t border-slate-50 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Márgenes por categoría</p>
-              {[
-                { label: 'Útiles escolares', pct: 41, color: '#7c3aed' },
-                { label: 'Papelería',         pct: 36, color: '#f59e0b' },
-                { label: 'Librería',          pct: 29, color: '#3b82f6' },
-              ].map(({ label, pct, color }) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-600">{label}</span>
-                    <span className="font-semibold text-slate-700">{pct}%</span>
-                  </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                  </div>
+            {totalCostos === 0 ? (
+              <div className="flex flex-col items-center py-10 text-center px-4">
+                <p className="text-sm text-slate-400">Sin costos registrados</p>
+                <Link href="/costos" className="mt-2 text-xs text-violet-600 font-semibold hover:underline">+ Agregar costos</Link>
+              </div>
+            ) : (
+              <div className="p-5 flex items-center gap-4">
+                <svg viewBox="0 0 110 110" width={100} height={100} className="shrink-0">
+                  <circle cx="55" cy="55" r="38" fill="none" stroke="#f1f5f9" strokeWidth="18" />
+                  {donutSegs.map((s, i) => (
+                    <circle key={i} cx="55" cy="55" r="38" fill="none"
+                      stroke={s.color} strokeWidth="18"
+                      strokeDasharray={`${s.dash} ${CIRCUM - s.dash}`}
+                      strokeDashoffset={s.offset}
+                      strokeLinecap="butt"
+                      transform="rotate(-90 55 55)"
+                    />
+                  ))}
+                  <text x="55" y="50" textAnchor="middle" fill="#475569" fontSize="8" fontWeight="600">Total</text>
+                  <text x="55" y="63" textAnchor="middle" fill="#7c3aed" fontSize="8" fontWeight="700">
+                    {formatMXN(totalCostos)}/mes
+                  </text>
+                </svg>
+                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                  {donutSegs.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} />
+                        <span className="text-xs text-slate-600 truncate">{s.label}</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-600 font-mono shrink-0">{s.pct}%</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="px-4 py-2 bg-violet-50 border-t border-violet-100 flex items-center gap-1.5">
-              <span className="text-[10px] text-violet-500 font-medium">Datos de ejemplo · configura tus costos para activar</span>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Financial health score (placeholder) */}
@@ -448,27 +491,70 @@ export default async function DashboardPage() {
         {/* ── Row 4: Suppliers + Channel sources ─────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Suppliers — placeholder */}
+          {/* Adeudos a Proveedores — datos reales */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
                 <p className="text-sm font-semibold text-slate-700">Adeudos a Proveedores</p>
                 <p className="text-xs text-slate-400 mt-0.5">Ordenado por urgencia</p>
               </div>
-              <span className="text-[10px] bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded font-semibold">Próximo</span>
+              <Link href="/proveedores" className="text-xs text-violet-600 font-medium hover:underline">Ver todos →</Link>
             </div>
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
-                <RefreshCcw className="w-6 h-6 text-slate-300" />
+
+            {(adeudosPendientes ?? []).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center mb-3">
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                </div>
+                <p className="text-sm font-semibold text-slate-600 mb-1">Sin adeudos pendientes</p>
+                <Link href="/proveedores" className="text-xs text-violet-600 font-semibold hover:underline">+ Registrar proveedor</Link>
               </div>
-              <p className="text-sm font-semibold text-slate-600 mb-1">Módulo de Proveedores</p>
-              <p className="text-xs text-slate-400 max-w-[200px]">
-                Registra tus proveedores y adeudos para ver vencimientos y alertas aquí.
-              </p>
-            </div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {(adeudosPendientes ?? []).map(a => {
+                  const dias = diasParaVencer(a.fecha_vencimiento)
+                  const prov = (a as any).proveedores?.nombre ?? '—'
+                  const vencido = dias < 0
+                  const urgente = dias >= 0 && dias <= 3
+
+                  return (
+                    <li key={a.id} className="flex items-center gap-3 px-5 py-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 border ${
+                        vencido ? 'bg-red-50 border-red-200 text-red-600' :
+                        urgente ? 'bg-amber-50 border-amber-200 text-amber-600' :
+                        'bg-slate-50 border-slate-200 text-slate-600'
+                      }`}>
+                        {prov.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{prov}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {vencido ? `Venció hace ${Math.abs(dias)} días` :
+                           dias === 0 ? '⚠ Vence hoy' :
+                           `Vence en ${dias} días`}
+                        </p>
+                      </div>
+                      <span className={`text-sm font-bold shrink-0 ${
+                        vencido ? 'text-red-600' : urgente ? 'text-amber-600' : 'text-slate-900'
+                      }`}>
+                        {formatMXNFull(Number(a.monto))}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
             <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Total adeudado</span>
-              <span className="text-base font-bold text-slate-300">—</span>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                {adeudosVencidos.length > 0 && (
+                  <span className="text-red-600 font-semibold">{adeudosVencidos.length} vencido{adeudosVencidos.length !== 1 ? 's' : ''}</span>
+                )}
+                {adeudosUrgentes.length > 0 && (
+                  <span className="text-amber-600 font-semibold">{adeudosUrgentes.length} urgente{adeudosUrgentes.length !== 1 ? 's' : ''}</span>
+                )}
+              </div>
+              <span className="text-base font-bold text-slate-900">{formatMXNFull(totalAdeudado)}</span>
             </div>
           </div>
 

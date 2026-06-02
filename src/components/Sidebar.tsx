@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Package, ShoppingCart, ClipboardList, Globe,
   MessageCircle, Users, BarChart3, LogOut, Menu, X, Clock,
+  Building2, Receipt,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
@@ -18,7 +19,9 @@ const MODULES = [
   { id: 'tienda',     label: 'Tienda online', href: '/tienda',     icon: Globe,         built: false, adminOnly: false },
   { id: 'chatbot',    label: 'Chatbot',       href: '/chatbot',    icon: MessageCircle, built: false, adminOnly: false },
   { id: 'clientes',   label: 'Clientes',      href: '/clientes',   icon: Users,         built: false, adminOnly: false },
-  { id: 'dashboard',  label: 'Dashboard',     href: '/dashboard',  icon: BarChart3,     built: true,  adminOnly: true  },
+  { id: 'proveedores', label: 'Proveedores',   href: '/proveedores', icon: Building2,    built: true,  adminOnly: true  },
+  { id: 'costos',      label: 'Costos',        href: '/costos',      icon: Receipt,      built: true,  adminOnly: true  },
+  { id: 'dashboard',   label: 'Dashboard',     href: '/dashboard',   icon: BarChart3,    built: true,  adminOnly: true  },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {
