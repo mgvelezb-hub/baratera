@@ -481,6 +481,40 @@ export default function VentaClient() {
       }
     }
 
+    // Insert venta header
+    const { data: ventaData, error: ventaError } = await supabase
+      .from('ventas')
+      .insert({
+        total:          totalCarrito(carrito),
+        metodo:         payment.metodo,
+        monto_efectivo: payment.montoEfectivo,
+        monto_tarjeta:  payment.montoTarjeta,
+        cambio:         payment.cambio,
+        cajero_id:      user?.id ?? null,
+      })
+      .select('id')
+      .single()
+
+    if (ventaError || !ventaData) {
+      setError('Error al registrar la venta. Intenta de nuevo.')
+      setConfirmando(false)
+      return
+    }
+
+    // Insert venta items
+    const ventaItems = carrito.map(item => {
+      const piezas   = piezasReales(item)
+      const subtotal = subtotalItem(item)
+      return {
+        venta_id:        ventaData.id,
+        producto_id:     item.producto.id,
+        cantidad:        piezas > 0 ? piezas : 1,
+        precio_unitario: piezas > 0 ? subtotal / piezas : Number(item.producto.precio_menudeo),
+        subtotal,
+      }
+    })
+    await supabase.from('venta_items').insert(ventaItems)
+
     // Write ledger + update stock
     for (const item of carrito) {
       const actual     = actuales!.find(p => p.id === item.producto.id)!

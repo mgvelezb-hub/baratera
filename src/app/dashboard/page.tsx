@@ -45,12 +45,8 @@ function formatMXNFull(n: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n)
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function calcRevenue(rows: any[]): number {
-  return (rows ?? []).reduce((sum: number, v: any) => {
-    const precio = Number(v.productos?.precio_menudeo ?? 0)
-    return sum + (v.qty_antes - v.qty_despues) * precio
-  }, 0)
+function sumTotal(rows: { total: number }[] | null): number {
+  return (rows ?? []).reduce((s, v) => s + Number(v.total), 0)
 }
 
 // ── Page ───────────────────────────────────────────────────────
@@ -76,19 +72,13 @@ export default async function DashboardPage() {
     { data: adeudosPendientes },
     { data: costosFijos },
     { data: comprasMes },
+    { data: ledgerSemana },
   ] = await Promise.all([
-    supabase.from('stock_ledger')
-      .select('qty_antes, qty_despues, productos(precio_menudeo)')
-      .eq('tipo', 'salida_venta_manual')
-      .gte('created_at', todayStart),
+    supabase.from('ventas').select('total').gte('created_at', todayStart),
     supabase.from('stock_ledger').select('id')
       .eq('tipo', 'entrada_compra').gte('created_at', todayStart),
-    supabase.from('stock_ledger')
-      .select('created_at, qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
-      .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
-    supabase.from('stock_ledger')
-      .select('qty_antes, qty_despues, productos(precio_menudeo)')
-      .eq('tipo', 'salida_venta_manual')
+    supabase.from('ventas').select('total, created_at').gte('created_at', sevenAgo),
+    supabase.from('ventas').select('total')
       .gte('created_at', fourteenAgo).lt('created_at', sevenAgo),
     supabase.from('productos').select('*').eq('activo', true).order('nombre'),
     supabase.from('stock_ledger')
@@ -104,12 +94,15 @@ export default async function DashboardPage() {
       .select('qty_antes, qty_despues, productos(precio_menudeo)')
       .eq('tipo', 'entrada_compra')
       .gte('created_at', mesInicio),
+    supabase.from('stock_ledger')
+      .select('qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
+      .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
-  const ingresosHoy      = calcRevenue(ventasHoy ?? [])
-  const ingresosSemana   = calcRevenue(ventasSemana ?? [])
-  const ingresosAnterior = calcRevenue(ventasAnterior ?? [])
+  const ingresosHoy      = sumTotal(ventasHoy)
+  const ingresosSemana   = sumTotal(ventasSemana)
+  const ingresosAnterior = sumTotal(ventasAnterior)
   const deltaIngresos    = ingresosAnterior > 0
     ? ((ingresosSemana - ingresosAnterior) / ingresosAnterior * 100)
     : null
@@ -126,17 +119,17 @@ export default async function DashboardPage() {
   const chartData: ChartDay[] = Array.from({ length: 7 }, (_, i) => {
     const d          = new Date(now.getTime() - (6 - i) * 86_400_000)
     const datePrefix = d.toISOString().split('T')[0]
-    const dayVentas  = (ventasSemana ?? []).filter((v: any) => v.created_at.startsWith(datePrefix))
+    const dayVentas  = (ventasSemana ?? []).filter(v => v.created_at.startsWith(datePrefix))
     return {
       fecha:         d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
-      ingresos:      calcRevenue(dayVentas),
+      ingresos:      dayVentas.reduce((s, v) => s + Number(v.total), 0),
       transacciones: dayVentas.length,
     }
   })
 
-  // ── Top movers ─────────────────────────────────────────
+  // ── Top movers (from ledger — tracks product-level movement) ──
   const movsByProd = new Map<string, { nombre: string; piezas: number; stock: number; minimo: number; unidad: string }>()
-  for (const v of (ventasSemana ?? [])) {
+  for (const v of (ledgerSemana ?? [])) {
     const p = (v as any).productos
     if (!p) continue
     const cur = movsByProd.get(p.nombre) ?? { nombre: p.nombre, piezas: 0, stock: 0, minimo: Number(p.stock_minimo ?? 0), unidad: p.unidad }

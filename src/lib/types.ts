@@ -118,3 +118,26 @@ export const TIPOS_MOVIMIENTO: Record<MovimientoTipo, { label: string; signo: 1 
   ajuste_negativo: { label: 'Ajuste (−)', signo: -1, color: 'text-red-600' },
   devolucion: { label: 'Devolución', signo: 1, color: 'text-purple-600' },
 }
+
+// ── Ventas ────────────────────────────────────────────────────
+export interface Venta {
+  id:             string
+  total:          number
+  metodo:         'efectivo' | 'tarjeta' | 'mixto'
+  monto_efectivo: number
+  monto_tarjeta:  number
+  cambio:         number
+  cajero_id:      string | null
+  created_at:     string
+}
+
+export interface VentaItem {
+  id:              string
+  venta_id:        string
+  producto_id:     string
+  cantidad:        number
+  precio_unitario: number
+  subtotal:        number
+  created_at:      string
+  productos?:      { nombre: string; unidad: string }
+}
