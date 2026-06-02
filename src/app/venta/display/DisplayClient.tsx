@@ -102,22 +102,11 @@ export default function DisplayClient() {
   }
 
   // ── Complete ──────────────────────────────────────────────
-  const metodoLabel = state.metodo === 'efectivo' ? 'Efectivo'
-    : state.metodo === 'tarjeta' ? 'Tarjeta'
-    : 'Efectivo + Tarjeta'
-
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-green-700 to-green-600 text-white select-none">
-      <CheckCircle2 className="w-24 h-24 text-green-200 mb-6" />
-      <h1 className="text-5xl font-bold mb-2">¡Gracias!</h1>
-      <p className="text-green-200 text-xl mb-8">Pago recibido · {metodoLabel}</p>
-      <div className="bg-white/20 rounded-2xl px-10 py-6 text-center">
-        <p className="text-green-100 text-sm mb-1">Total pagado</p>
-        <p className="text-4xl font-bold">{formatMXN(state.total)}</p>
-        {state.cambio > 0 && (
-          <p className="text-green-200 text-xl mt-2">Cambio: {formatMXN(state.cambio)}</p>
-        )}
-      </div>
+      <CheckCircle2 className="w-28 h-28 text-green-200 mb-8" />
+      <h1 className="text-6xl font-bold mb-4">¡Gracias por tu compra!</h1>
+      <p className="text-green-200 text-2xl">¡Regresa pronto!</p>
     </div>
   )
 }
