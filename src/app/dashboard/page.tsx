@@ -4,20 +4,19 @@ import SalesChart from './SalesChart'
 import type { ChartDay } from './SalesChart'
 import { calcularSemaforo } from '@/lib/types'
 import {
-  ShoppingCart, TrendingUp, AlertTriangle, Package,
-  ArrowDownRight, ArrowUpRight, Settings2, RefreshCcw,
-  RotateCcw,
+  TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight,
+  ShoppingCart, Zap, Monitor, Globe, Clock, RefreshCcw,
 } from 'lucide-react'
 import Link from 'next/link'
 
 // ── Helpers ────────────────────────────────────────────────────
 const TIPO_META: Record<string, { label: string; color: string }> = {
-  salida_venta_manual:      { label: 'Venta',         color: 'text-violet-600 bg-violet-50' },
-  entrada_compra:           { label: 'Entrada',        color: 'text-green-600 bg-green-50'  },
-  ajuste_positivo:          { label: 'Ajuste (+)',     color: 'text-blue-600 bg-blue-50'    },
-  ajuste_negativo:          { label: 'Ajuste (−)',     color: 'text-amber-600 bg-amber-50'  },
-  devolucion:               { label: 'Devolución',     color: 'text-purple-600 bg-purple-50'},
-  levantamiento_inventario: { label: 'Levantamiento',  color: 'text-slate-600 bg-slate-100' },
+  salida_venta_manual:      { label: 'Venta',        color: 'text-violet-600 bg-violet-50' },
+  entrada_compra:           { label: 'Entrada',       color: 'text-green-600 bg-green-50'  },
+  ajuste_positivo:          { label: 'Ajuste (+)',    color: 'text-blue-600 bg-blue-50'    },
+  ajuste_negativo:          { label: 'Ajuste (−)',    color: 'text-amber-600 bg-amber-50'  },
+  devolucion:               { label: 'Devolución',    color: 'text-purple-600 bg-purple-50'},
+  levantamiento_inventario: { label: 'Inventario',   color: 'text-slate-600 bg-slate-100' },
 }
 
 function tiempoRelativo(dateStr: string): string {
@@ -36,229 +35,595 @@ function usuarioLabel(notas: string | null, canal: string | null): string {
   return canal === 'manual' ? 'Manual' : canal ?? '—'
 }
 
+function formatMXN(n: number) {
+  if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n)
+}
+
+function formatMXNFull(n: number) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function calcRevenue(rows: any[]): number {
+  return (rows ?? []).reduce((sum: number, v: any) => {
+    const precio = Number(v.productos?.precio_menudeo ?? 0)
+    return sum + (v.qty_antes - v.qty_despues) * precio
+  }, 0)
+}
+
 // ── Page ───────────────────────────────────────────────────────
 export const revalidate = 60
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-
-  const now        = new Date()
-  const todayStr   = now.toISOString().split('T')[0]
-  const todayStart = `${todayStr}T00:00:00`
-  const sevenAgo   = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const supabase    = await createClient()
+  const now         = new Date()
+  const todayStr    = now.toISOString().split('T')[0]
+  const todayStart  = `${todayStr}T00:00:00`
+  const sevenAgo    = new Date(now.getTime() -  7 * 86_400_000).toISOString()
+  const fourteenAgo = new Date(now.getTime() - 14 * 86_400_000).toISOString()
 
   const [
     { data: ventasHoy },
     { data: entradasHoy },
     { data: ventasSemana },
+    { data: ventasAnterior },
     { data: productos },
     { data: movimientos },
   ] = await Promise.all([
-    supabase.from('stock_ledger').select('qty_antes, qty_despues').eq('tipo', 'salida_venta_manual').gte('created_at', todayStart),
-    supabase.from('stock_ledger').select('id').eq('tipo', 'entrada_compra').gte('created_at', todayStart),
-    supabase.from('stock_ledger').select('created_at, qty_antes, qty_despues').eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
-    supabase.from('productos').select('id, nombre, stock_fisico, stock_minimo, unidad').eq('activo', true).order('stock_fisico', { ascending: true }),
-    supabase.from('stock_ledger').select('id, tipo, qty_antes, qty_despues, notas, canal, created_at, productos(nombre, unidad)').order('created_at', { ascending: false }).limit(20),
+    supabase.from('stock_ledger')
+      .select('qty_antes, qty_despues, productos(precio_menudeo)')
+      .eq('tipo', 'salida_venta_manual')
+      .gte('created_at', todayStart),
+    supabase.from('stock_ledger').select('id')
+      .eq('tipo', 'entrada_compra').gte('created_at', todayStart),
+    supabase.from('stock_ledger')
+      .select('created_at, qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
+      .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
+    supabase.from('stock_ledger')
+      .select('qty_antes, qty_despues, productos(precio_menudeo)')
+      .eq('tipo', 'salida_venta_manual')
+      .gte('created_at', fourteenAgo).lt('created_at', sevenAgo),
+    supabase.from('productos').select('*').eq('activo', true).order('nombre'),
+    supabase.from('stock_ledger')
+      .select('id, tipo, qty_antes, qty_despues, notas, canal, created_at, productos(nombre, unidad)')
+      .order('created_at', { ascending: false }).limit(12),
   ])
 
-  const transaccionesHoy  = ventasHoy?.length ?? 0
-  const piezasHoy         = ventasHoy?.reduce((a, v) => a + (v.qty_antes - v.qty_despues), 0) ?? 0
-  const entradasCount     = entradasHoy?.length ?? 0
-  const productosAlerta   = (productos ?? []).filter(p => p.stock_fisico < p.stock_minimo)
-  const totalActivos      = productos?.length ?? 0
+  // ── KPI calculations ──────────────────────────────────────
+  const ingresosHoy      = calcRevenue(ventasHoy ?? [])
+  const ingresosSemana   = calcRevenue(ventasSemana ?? [])
+  const ingresosAnterior = calcRevenue(ventasAnterior ?? [])
+  const deltaIngresos    = ingresosAnterior > 0
+    ? ((ingresosSemana - ingresosAnterior) / ingresosAnterior * 100)
+    : null
 
+  const transaccionesHoy = ventasHoy?.length ?? 0
+  const ticketPromedio   = transaccionesHoy > 0 ? ingresosHoy / transaccionesHoy : 0
+  const entradasCount    = entradasHoy?.length ?? 0
+
+  const productosAlerta  = (productos ?? []).filter(p => p.stock_fisico < p.stock_minimo)
+  const productosRojo    = productosAlerta.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'rojo')
+  const totalActivos     = productos?.length ?? 0
+
+  // ── Chart data ────────────────────────────────────────────
   const chartData: ChartDay[] = Array.from({ length: 7 }, (_, i) => {
-    const d          = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000)
+    const d          = new Date(now.getTime() - (6 - i) * 86_400_000)
     const datePrefix = d.toISOString().split('T')[0]
-    const dayVentas  = (ventasSemana ?? []).filter(v => v.created_at.startsWith(datePrefix))
+    const dayVentas  = (ventasSemana ?? []).filter((v: any) => v.created_at.startsWith(datePrefix))
     return {
       fecha:         d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
+      ingresos:      calcRevenue(dayVentas),
       transacciones: dayVentas.length,
-      piezas:        dayVentas.reduce((a, v) => a + (v.qty_antes - v.qty_despues), 0),
     }
   })
 
-  const fechaLabel = now.toLocaleDateString('es-MX', {
-    weekday: 'long', day: 'numeric', month: 'long',
+  // ── Top movers ─────────────────────────────────────────
+  const movsByProd = new Map<string, { nombre: string; piezas: number; stock: number; minimo: number; unidad: string }>()
+  for (const v of (ventasSemana ?? [])) {
+    const p = (v as any).productos
+    if (!p) continue
+    const cur = movsByProd.get(p.nombre) ?? { nombre: p.nombre, piezas: 0, stock: 0, minimo: Number(p.stock_minimo ?? 0), unidad: p.unidad }
+    cur.piezas += (v.qty_antes - v.qty_despues)
+    movsByProd.set(p.nombre, cur)
+  }
+  for (const p of (productos ?? [])) {
+    if (movsByProd.has(p.nombre)) {
+      movsByProd.get(p.nombre)!.stock  = p.stock_fisico
+      movsByProd.get(p.nombre)!.minimo = p.stock_minimo
+    }
+  }
+  const topMovers = [...movsByProd.values()].sort((a, b) => b.piezas - a.piezas).slice(0, 6)
+
+  // ── Alerts ────────────────────────────────────────────────
+  type AlertItem = { level: 'danger' | 'warn' | 'info'; title: string; body: string }
+  const alerts: AlertItem[] = []
+
+  for (const p of productosRojo.slice(0, 3)) {
+    alerts.push({
+      level: 'danger',
+      title: `Stock crítico: ${p.nombre}`,
+      body:  `Solo ${p.stock_fisico} ${p.unidad} · mínimo ${p.stock_minimo}`,
+    })
+  }
+  for (const p of productosAlerta.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'amarillo').slice(0, 2)) {
+    alerts.push({
+      level: 'warn',
+      title: `Stock bajo: ${p.nombre}`,
+      body:  `${p.stock_fisico} ${p.unidad} · mínimo ${p.stock_minimo}`,
+    })
+  }
+  if (alerts.length === 0) {
+    alerts.push({ level: 'info', title: 'Todo en orden', body: 'Ningún producto bajo stock mínimo.' })
+  }
+  alerts.push({
+    level: 'info',
+    title: 'Alertas de pagos y proveedores',
+    body:  'Próximamente: vencimientos y adeudos activos.',
   })
+
+  const fechaLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <AppShell>
-      <div className="px-4 py-5 max-w-5xl mx-auto space-y-5">
+      <div className="px-4 py-5 max-w-6xl mx-auto space-y-5">
 
-        {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500 capitalize">{fechaLabel}</p>
+        {/* ── Header ────────────────────────────────────────── */}
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Resumen General</h1>
+            <p className="text-sm text-slate-500 capitalize">{fechaLabel} · Solo canal POS activo</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+              Punto de Venta
+            </span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium">
+              Online / Redes
+              <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-semibold">Próximo</span>
+            </span>
+          </div>
         </div>
 
-        {/* ── KPI cards ────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPICard
-            label="Ventas hoy"
-            value={transaccionesHoy}
-            suffix="transacciones"
-            icon={<ShoppingCart className="w-5 h-5" />}
-            color="violet"
+        {/* ── KPI strip (5) ────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <KPI
+            label="Ingresos 7 días"
+            value={formatMXN(ingresosSemana)}
+            delta={deltaIngresos !== null ? { pct: deltaIngresos, label: 'vs semana anterior' } : null}
+            accent="violet"
+            sub="canal POS · aprox."
           />
-          <KPICard
-            label="Piezas vendidas"
-            value={piezasHoy}
-            suffix="unidades hoy"
-            icon={<ArrowDownRight className="w-5 h-5" />}
-            color="blue"
+          <KPI
+            label="Ingresos hoy"
+            value={formatMXN(ingresosHoy)}
+            delta={null}
+            accent="blue"
+            sub={`${transaccionesHoy} movimientos`}
           />
-          <KPICard
-            label="Entradas hoy"
-            value={entradasCount}
-            suffix="compras a proveedor"
-            icon={<TrendingUp className="w-5 h-5" />}
-            color="green"
+          <KPI
+            label="Ticket promedio"
+            value={transaccionesHoy > 0 ? formatMXNFull(ticketPromedio) : '—'}
+            delta={null}
+            accent="purple"
+            sub="hoy · aprox."
           />
-          <KPICard
+          <KPI
             label="Stock crítico"
-            value={productosAlerta.length}
-            suffix={`de ${totalActivos} activos`}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            color={productosAlerta.length > 0 ? 'red' : 'slate'}
+            value={String(productosAlerta.length)}
+            delta={null}
+            accent={productosAlerta.length > 0 ? 'red' : 'green'}
+            sub={`de ${totalActivos} activos`}
+          />
+          <KPI
+            label="Entradas hoy"
+            value={String(entradasCount)}
+            delta={null}
+            accent="green"
+            sub="compras a proveedor"
           />
         </div>
 
-        {/* ── Sales chart ───────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <p className="text-sm font-semibold text-slate-700 mb-4">Ventas últimos 7 días</p>
-          <SalesChart data={chartData} />
-        </div>
+        {/* ── Row 2: Revenue chart + Alerts ─────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* ── Bottom grid ───────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Revenue chart */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  Ingresos por día
+                  <span className="text-[10px] bg-violet-50 text-violet-500 border border-violet-200 px-2 py-0.5 rounded font-semibold">+ Online próximo</span>
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">POS únicamente · estimado por precio menudeo</p>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 rounded bg-violet-500" />POS
+                </span>
+                <span className="flex items-center gap-1.5 opacity-40">
+                  <span className="w-3 h-0.5 rounded bg-violet-300 border-dashed" />Online
+                </span>
+              </div>
+            </div>
+            <div className="p-5 pb-3">
+              <SalesChart data={chartData} />
+            </div>
+          </div>
 
-          {/* Stock crítico */}
+          {/* Alerts */}
           <div className="bg-white rounded-2xl border border-slate-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <p className="text-sm font-semibold text-slate-700">Stock crítico</p>
-              <Link href="/inventario" className="text-xs text-violet-600 hover:underline font-medium">
-                Ver inventario →
-              </Link>
+              <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />Alertas
+              </p>
+              <Link href="/inventario" className="text-xs text-violet-600 font-medium hover:underline">Ver inventario →</Link>
             </div>
-
-            {productosAlerta.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                <Package className="w-8 h-8 text-slate-200 mb-2" />
-                <p className="text-sm text-slate-500 font-medium">¡Todo el stock está OK!</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {productosAlerta.slice(0, 8).map(p => {
-                  const sem = calcularSemaforo(p.stock_fisico, p.stock_minimo)
-                  return (
-                    <li key={p.id}>
-                      <Link
-                        href={`/inventario/${p.id}`}
-                        className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${
-                            sem === 'rojo' ? 'bg-red-500' : 'bg-amber-400'
-                          }`} />
-                          <p className="text-sm text-slate-800 font-medium truncate">{p.nombre}</p>
-                        </div>
-                        <div className="text-right shrink-0 ml-3">
-                          <p className={`text-sm font-bold ${sem === 'rojo' ? 'text-red-600' : 'text-amber-600'}`}>
-                            {p.stock_fisico}
-                            <span className="text-xs font-normal text-slate-400 ml-1">{p.unidad}</span>
-                          </p>
-                          <p className="text-xs text-slate-400">mín {p.stock_minimo}</p>
-                        </div>
-                      </Link>
-                    </li>
-                  )
-                })}
-                {productosAlerta.length > 8 && (
-                  <li className="px-5 py-3 text-xs text-slate-400 text-center">
-                    +{productosAlerta.length - 8} más en inventario
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
-
-          {/* Actividad reciente */}
-          <div className="bg-white rounded-2xl border border-slate-200">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <p className="text-sm font-semibold text-slate-700">Actividad reciente</p>
+            <div className="p-3 space-y-2">
+              {alerts.map((a, i) => (
+                <AlertRow key={i} level={a.level} title={a.title} body={a.body} />
+              ))}
             </div>
-
-            {!movimientos || movimientos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                <RefreshCcw className="w-8 h-8 text-slate-200 mb-2" />
-                <p className="text-sm text-slate-500">Sin movimientos registrados</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {movimientos.map(m => {
-                  const meta  = TIPO_META[m.tipo] ?? TIPO_META.ajuste_positivo
-                  const diff  = m.qty_antes - m.qty_despues
-                  const signo = diff > 0 ? '−' : '+'
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const prod  = m.productos as any
-                  const quien = usuarioLabel(m.notas, m.canal)
-
-                  return (
-                    <li key={m.id} className="flex items-center gap-3 px-5 py-3">
-                      <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${meta.color}`}>
-                        {meta.label.charAt(0)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-800 font-medium truncate">
-                          {prod?.nombre ?? '—'}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {meta.label} · {quien}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-sm font-semibold ${diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {signo}{Math.abs(diff)} {prod?.unidad ?? ''}
-                        </p>
-                        <p className="text-xs text-slate-400">{tiempoRelativo(m.created_at)}</p>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
           </div>
 
         </div>
+
+        {/* ── Row 3: Inventory + Cost donut + Health score ──── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Top movers */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Top Productos</p>
+                <p className="text-xs text-slate-400 mt-0.5">Por movimiento · últimos 7 días</p>
+              </div>
+              <Link href="/inventario" className="text-xs text-violet-600 font-medium hover:underline">Ver todo →</Link>
+            </div>
+            {topMovers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+                <Package className="w-8 h-8 text-slate-200 mb-2" />
+                <p className="text-sm text-slate-400">Sin ventas esta semana</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Producto</th>
+                    <th className="px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Stock</th>
+                    <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Mov.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topMovers.map((item, i) => {
+                    const sem     = calcularSemaforo(item.stock, item.minimo)
+                    const pct     = item.minimo > 0 ? Math.min(100, Math.round(item.stock / (item.minimo * 3) * 100)) : 50
+                    const barClr  = sem === 'rojo' ? '#ef4444' : sem === 'amarillo' ? '#f59e0b' : '#7c3aed'
+                    return (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <p className="text-xs font-semibold text-slate-800 truncate max-w-[120px]">{item.nombre}</p>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barClr }} />
+                            </div>
+                            <span className="text-[10px] text-slate-500">{item.stock} {item.unidad}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className="text-xs font-bold text-slate-700">{item.piezas}</span>
+                          <span className="text-[10px] text-slate-400 ml-0.5">pzs</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Cost structure donut (placeholder) */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-700">Estructura de Costos</p>
+              <p className="text-xs text-slate-400 mt-0.5">Configura costos fijos para activar</p>
+            </div>
+            <div className="flex items-center gap-4 p-5">
+              {/* Donut SVG — placeholder values */}
+              <svg viewBox="0 0 110 110" width={100} height={100} className="shrink-0">
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#f1f5f9" strokeWidth="16" />
+                {/* Mercancía 52% */}
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#7c3aed" strokeWidth="16"
+                  strokeDasharray="124 115" strokeDashoffset="0" strokeLinecap="butt"
+                  transform="rotate(-90 55 55)" />
+                {/* Personal 20% */}
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#8b5cf6" strokeWidth="16"
+                  strokeDasharray="48 191" strokeDashoffset="-124" strokeLinecap="butt"
+                  transform="rotate(-90 55 55)" />
+                {/* Renta 18% */}
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#a78bfa" strokeWidth="16"
+                  strokeDasharray="43 196" strokeDashoffset="-172" strokeLinecap="butt"
+                  transform="rotate(-90 55 55)" />
+                {/* Otros 10% */}
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#c4b5fd" strokeWidth="16"
+                  strokeDasharray="24 215" strokeDashoffset="-215" strokeLinecap="butt"
+                  transform="rotate(-90 55 55)" />
+                <text x="55" y="51" textAnchor="middle" fill="#1e293b" fontSize="12" fontWeight="600">62%</text>
+                <text x="55" y="63" textAnchor="middle" fill="#94a3b8" fontSize="8">costos</text>
+              </svg>
+              <div className="flex flex-col gap-2.5 flex-1">
+                {[
+                  { label: 'Mercancía',  pct: '52%', color: '#7c3aed' },
+                  { label: 'Personal',   pct: '20%', color: '#8b5cf6' },
+                  { label: 'Renta',      pct: '18%', color: '#a78bfa' },
+                  { label: 'Otros',      pct: '10%', color: '#c4b5fd' },
+                ].map(({ label, pct, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                      <span className="text-xs text-slate-600">{label}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 font-mono">{pct}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Category margins */}
+            <div className="px-5 pb-4 space-y-2 border-t border-slate-50 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Márgenes por categoría</p>
+              {[
+                { label: 'Útiles escolares', pct: 41, color: '#7c3aed' },
+                { label: 'Papelería',         pct: 36, color: '#f59e0b' },
+                { label: 'Librería',          pct: 29, color: '#3b82f6' },
+              ].map(({ label, pct, color }) => (
+                <div key={label} className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-600">{label}</span>
+                    <span className="font-semibold text-slate-700">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2 bg-violet-50 border-t border-violet-100 flex items-center gap-1.5">
+              <span className="text-[10px] text-violet-500 font-medium">Datos de ejemplo · configura tus costos para activar</span>
+            </div>
+          </div>
+
+          {/* Financial health score (placeholder) */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-700">Salud Financiera</p>
+            </div>
+            <div className="flex flex-col items-center px-5 pt-4 pb-2">
+              {/* Gauge SVG */}
+              <svg viewBox="0 0 120 70" width="160">
+                <path d="M15 65 A45 45 0 0 1 105 65" fill="none" stroke="#f1f5f9" strokeWidth="10" strokeLinecap="round" />
+                <path d="M15 65 A45 45 0 0 1 87 26"  fill="none" stroke="#7c3aed" strokeWidth="10" strokeLinecap="round" />
+                <line x1="60" y1="65" x2="52" y2="28" stroke="#1e293b" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="60" cy="65" r="5" fill="#fff" stroke="#1e293b" strokeWidth="1.5" />
+                <text x="10"  y="72" fill="#94a3b8" fontSize="8" fontFamily="monospace">0</text>
+                <text x="55"  y="18" fill="#94a3b8" fontSize="8" fontFamily="monospace">50</text>
+                <text x="102" y="72" fill="#94a3b8" fontSize="8" fontFamily="monospace">100</text>
+              </svg>
+              <p className="text-4xl font-bold text-violet-600 -mt-1">72</p>
+              <p className="text-xs font-semibold text-green-600 mt-0.5">Salud Buena</p>
+              <p className="text-[11px] text-slate-400 text-center mt-1 max-w-[160px]">
+                Liquidez estable · Stock saludable · Conecta proveedores para score completo
+              </p>
+            </div>
+            <div className="border-t border-slate-100">
+              {[
+                { label: 'Productos activos',  value: `${totalActivos}`, color: 'text-violet-600', points: [18,15,10,12,6,4] },
+                { label: 'En stock crítico',    value: `${productosAlerta.length} / ${totalActivos}`, color: productosAlerta.length > 0 ? 'text-amber-600' : 'text-green-600', points: [6,10,8,14,10,12] },
+                { label: 'Ingresos 7D',         value: formatMXN(ingresosSemana), color: 'text-blue-600', points: [10,12,14,16,14,15] },
+              ].map(({ label, value, color, points }) => (
+                <div key={label} className="flex items-center justify-between px-5 py-2.5 border-b border-slate-50">
+                  <div>
+                    <p className="text-[11px] text-slate-500">{label}</p>
+                    <p className={`text-sm font-bold ${color}`}>{value}</p>
+                  </div>
+                  <svg viewBox="0 0 60 24" width="56" height="24">
+                    <polyline
+                      points={points.map((y, x) => `${x * 12},${24 - y}`).join(' ')}
+                      fill="none" stroke={color.replace('text-', '').includes('violet') ? '#7c3aed' : color.includes('amber') ? '#f59e0b' : '#3b82f6'}
+                      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2 bg-violet-50 border-t border-violet-100">
+              <span className="text-[10px] text-violet-500 font-medium">Score parcial · mejora al conectar proveedores y costos</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Row 4: Suppliers + Channel sources ─────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Suppliers — placeholder */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Adeudos a Proveedores</p>
+                <p className="text-xs text-slate-400 mt-0.5">Ordenado por urgencia</p>
+              </div>
+              <span className="text-[10px] bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded font-semibold">Próximo</span>
+            </div>
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
+                <RefreshCcw className="w-6 h-6 text-slate-300" />
+              </div>
+              <p className="text-sm font-semibold text-slate-600 mb-1">Módulo de Proveedores</p>
+              <p className="text-xs text-slate-400 max-w-[200px]">
+                Registra tus proveedores y adeudos para ver vencimientos y alertas aquí.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Total adeudado</span>
+              <span className="text-base font-bold text-slate-300">—</span>
+            </div>
+          </div>
+
+          {/* Channel sources */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-700">Fuentes de Ingreso</p>
+              <p className="text-xs text-slate-400 mt-0.5">Conecta más canales para vista completa</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 p-4">
+
+              {/* POS — live */}
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                    <Monitor className="w-3.5 h-3.5 text-violet-600" />POS Local
+                  </div>
+                  <span className="text-[10px] bg-violet-100 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-full font-bold">EN VIVO</span>
+                </div>
+                <p className="text-xl font-bold text-slate-900 font-mono">{formatMXN(ingresosSemana)}</p>
+                <div className="h-1 bg-violet-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-violet-500 rounded-full w-full" />
+                </div>
+                <p className="text-[10px] text-slate-500">{(ventasSemana ?? []).length} movimientos · 7 días</p>
+              </div>
+
+              {/* Tienda online — soon */}
+              <ChannelSoon icon={<Globe className="w-3.5 h-3.5" />} name="Tienda Online" hint="Conecta tu tienda para ver ventas unificadas" />
+
+              {/* Instagram — soon */}
+              <ChannelSoon icon={<span className="text-sm">📱</span>} name="Instagram" hint="Ventas por DM y catálogo aquí" />
+
+              {/* Marketplace — soon */}
+              <ChannelSoon icon={<span className="text-sm">🛒</span>} name="Marketplace" hint="MercadoLibre u otros canales" />
+
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Activity log ──────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-700">Actividad reciente</p>
+          </div>
+          {!movimientos || movimientos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <RefreshCcw className="w-8 h-8 text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">Sin movimientos registrados</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-50">
+              {movimientos.map(m => {
+                const meta  = TIPO_META[m.tipo] ?? TIPO_META.ajuste_positivo
+                const diff  = m.qty_antes - m.qty_despues
+                const signo = diff > 0 ? '−' : '+'
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const prod  = m.productos as any
+                const quien = usuarioLabel(m.notas, m.canal)
+                return (
+                  <li key={m.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                    <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${meta.color}`}>
+                      {meta.label.charAt(0)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-800 font-medium truncate">{prod?.nombre ?? '—'}</p>
+                      <p className="text-xs text-slate-400">{meta.label} · {quien}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-semibold ${diff > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {signo}{Math.abs(diff)} {prod?.unidad ?? ''}
+                      </p>
+                      <p className="text-xs text-slate-400">{tiempoRelativo(m.created_at)}</p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
       </div>
     </AppShell>
   )
 }
 
-// ── KPI Card component ─────────────────────────────────────────
-function KPICard({ label, value, suffix, icon, color }: {
-  label: string
-  value: number
-  suffix: string
-  icon: React.ReactNode
-  color: 'violet' | 'blue' | 'green' | 'red' | 'slate'
+// ── Sub-components ─────────────────────────────────────────────
+
+function KPI({ label, value, delta, accent, sub }: {
+  label:  string
+  value:  string
+  delta:  { pct: number; label: string } | null
+  accent: 'violet' | 'blue' | 'purple' | 'green' | 'red'
+  sub:    string
 }) {
-  const palette = {
-    violet: 'bg-violet-50 text-violet-600',
-    blue:   'bg-blue-50 text-blue-600',
-    green:  'bg-green-50 text-green-600',
-    red:    'bg-red-50 text-red-600',
-    slate:  'bg-slate-100 text-slate-500',
-  }
+  const bar = {
+    violet: 'bg-violet-500',
+    blue:   'bg-blue-500',
+    purple: 'bg-purple-500',
+    green:  'bg-green-500',
+    red:    'bg-red-500',
+  }[accent]
+
+  const up   = delta && delta.pct >= 0
+  const down = delta && delta.pct < 0
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${palette[color]}`}>
-        {icon}
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 relative overflow-hidden">
+      <div className={`absolute top-0 left-0 right-0 h-0.5 ${bar} opacity-60`} />
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">{label}</p>
+      <p className="text-2xl font-bold text-slate-900 font-mono leading-none mb-2">{value}</p>
+      {delta !== null ? (
+        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+          up ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+        }`}>
+          {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          {up ? '+' : ''}{delta.pct.toFixed(1)}%
+        </span>
+      ) : null}
+      <p className="text-[10px] text-slate-400 mt-1">{sub}</p>
+    </div>
+  )
+}
+
+function AlertRow({ level, title, body }: { level: 'danger' | 'warn' | 'info'; title: string; body: string }) {
+  const styles = {
+    danger: { wrap: 'bg-red-50 border-red-200',    icon: '🔴', titleCls: 'text-red-800',    bodyCls: 'text-red-600'    },
+    warn:   { wrap: 'bg-amber-50 border-amber-200', icon: '🟡', titleCls: 'text-amber-800',  bodyCls: 'text-amber-600'  },
+    info:   { wrap: 'bg-blue-50 border-blue-200',   icon: '🔵', titleCls: 'text-blue-800',   bodyCls: 'text-blue-600'   },
+  }[level]
+
+  return (
+    <div className={`flex items-start gap-2.5 p-2.5 rounded-xl border ${styles.wrap}`}>
+      <span className="text-sm mt-0.5 shrink-0">{styles.icon}</span>
+      <div>
+        <p className={`text-xs font-semibold ${styles.titleCls}`}>{title}</p>
+        <p className={`text-[11px] ${styles.bodyCls} mt-0.5`}>{body}</p>
       </div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      <p className="text-sm font-medium text-slate-600 mt-0.5">{label}</p>
-      <p className="text-xs text-slate-400">{suffix}</p>
+    </div>
+  )
+}
+
+function ChannelSoon({ icon, name, hint }: { icon: React.ReactNode; name: string; hint: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-2 opacity-60">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          {icon}{name}
+        </div>
+        <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-semibold">Próximo</span>
+      </div>
+      <div className="flex flex-col items-center justify-center py-3 text-center gap-1">
+        <Globe className="w-5 h-5 text-slate-300" />
+        <p className="text-[10px] text-slate-400">{hint}</p>
+      </div>
     </div>
   )
 }
