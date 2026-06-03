@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Printer, Mail, Phone, X } from 'lucide-react'
+import { Printer, Mail, MessageCircle, X } from 'lucide-react'
 import { formatMXN, pluralUnidad } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
 
@@ -124,23 +124,38 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     }
   }
 
-  // ── SMS via sms: ─────────────────────────────────────────────
-  function handleSMS() {
+  // ── WhatsApp ──────────────────────────────────────────────────
+  function handleWhatsApp() {
     if (!telefono.trim()) return
-    const lines = [
-      'La Más Baratera',
-      `Total: ${formatMXN(total)} · ${metodoLabel}`,
-      ...(payment.cambio > 0 ? [`Cambio: ${formatMXN(payment.cambio)}`] : []),
-      '¡Gracias!',
-    ]
-    const body = encodeURIComponent(lines.join('\n'))
-    window.location.href = `sms:${telefono}?body=${body}`
+
+    const lines: string[] = ['📋 *La Más Baratera*', `🕐 ${hora}`, '']
+
+    items.forEach(item => {
+      const parts: string[] = []
+      if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
+      if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
+      const qty   = parts.join(' + ')
+      const color = item.colorNombre ? ` · ${item.colorNombre}` : ''
+      lines.push(`• ${item.nombre} (${qty}${color}) — ${formatMXN(item.subtotal)}`)
+    })
+
+    lines.push('', `💰 *TOTAL: ${formatMXN(total)}*`, `Pago: ${metodoLabel}`)
+    if (payment.montoEfectivo    > 0) lines.push(`Efectivo: ${formatMXN(payment.montoEfectivo)}`)
+    if (payment.montoTarjeta     > 0) lines.push(`Tarjeta: ${formatMXN(payment.montoTarjeta)}`)
+    if (payment.cambio           > 0) lines.push(`Cambio: *${formatMXN(payment.cambio)}*`)
+    lines.push('', '¡Gracias por su compra! 🙏')
+
+    // Normaliza número mexicano: 10 dígitos → prefija 52
+    const digits = telefono.replace(/\D/g, '')
+    const phone  = digits.startsWith('52') ? digits : `52${digits}`
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank')
   }
 
   const TABS = [
     { id: 'imprimir',  label: 'Imprimir', Icon: Printer },
     { id: 'correo',    label: 'Correo',   Icon: Mail    },
-    { id: 'telefono',  label: 'Teléfono', Icon: Phone   },
+    { id: 'telefono',  label: 'WhatsApp', Icon: MessageCircle },
   ] as const
 
   return (
@@ -291,24 +306,27 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             </div>
           )}
 
-          {/* Teléfono */}
+          {/* WhatsApp */}
           {tab === 'telefono' && (
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                value={telefono}
-                onChange={e => setTelefono(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSMS()}
-                placeholder="+52 55 1234 5678"
-                className="flex-1 h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
-              <button
-                onClick={handleSMS}
-                disabled={!telefono.trim()}
-                className="h-11 px-4 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold rounded-xl transition-colors"
-              >
-                Enviar
-              </button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={telefono}
+                  onChange={e => setTelefono(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleWhatsApp()}
+                  placeholder="55 1234 5678"
+                  className="flex-1 h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  onClick={handleWhatsApp}
+                  disabled={!telefono.trim()}
+                  className="h-11 px-4 bg-green-600 hover:bg-green-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Enviar
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 text-center">Abre WhatsApp con el ticket listo para enviar</p>
             </div>
           )}
 
