@@ -313,7 +313,7 @@ function CartItemRow({
               max={maxPiezas(item)}
               onChange={v => onSetPiezas(key, v)}
               color="slate"
-              label="pza"
+              label={p.unidad}
             />
             {item.cantidadPiezas > 0 && (
               <span className="text-xs text-slate-500">

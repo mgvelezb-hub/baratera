@@ -61,8 +61,8 @@ export default function DisplayClient() {
             <tbody className="divide-y divide-slate-100">
               {state.items.map((item, i) => {
                 const parts: string[] = []
-                if (item.cantidadCajas > 0)  parts.push(`${item.cantidadCajas} cajas`)
-                if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} piezas`)
+                if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja${item.cantidadCajas !== 1 ? 's' : ''}`)
+                if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
                 return (
                   <tr key={i} className="text-slate-800">
                     <td className="py-4 text-base font-medium">{item.nombre}</td>
