@@ -1,8 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+const COLOR_PALETTE = [
+  { nombre: 'Rojo',      hex: '#ef4444' },
+  { nombre: 'Naranja',   hex: '#f97316' },
+  { nombre: 'Amarillo',  hex: '#eab308' },
+  { nombre: 'Verde',     hex: '#22c55e' },
+  { nombre: 'Azul',      hex: '#3b82f6' },
+  { nombre: 'Morado',    hex: '#a855f7' },
+  { nombre: 'Rosa',      hex: '#ec4899' },
+  { nombre: 'Negro',     hex: '#1e293b' },
+  { nombre: 'Blanco',    hex: '#f8fafc' },
+  { nombre: 'Gris',      hex: '#94a3b8' },
+  { nombre: 'Café',      hex: '#92400e' },
+  { nombre: 'Turquesa',  hex: '#06b6d4' },
+]
+
+interface ColorDraft { nombre: string; hex: string }
 
 const UNIDADES = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
 const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
@@ -13,8 +30,12 @@ interface Props {
 }
 
 export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [loading,          setLoading]          = useState(false)
+  const [error,            setError]            = useState('')
+  const [coloresDraft,     setColoresDraft]     = useState<ColorDraft[]>([])
+  const [nuevoColorHex,    setNuevoColorHex]    = useState(COLOR_PALETTE[0].hex)
+  const [nuevoColorNombre, setNuevoColorNombre] = useState('')
+  const [colorError,       setColorError]       = useState('')
   const [form, setForm] = useState({
     nombre: '',
     sku: '',
@@ -84,6 +105,13 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
         canal: 'manual',
         usuario_id: user?.id ?? null,
       })
+    }
+
+    // Insertar colores si se definieron
+    if (coloresDraft.length > 0) {
+      await supabase.from('producto_colores').insert(
+        coloresDraft.map(c => ({ producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: 0 }))
+      )
     }
 
     onSuccess()
@@ -249,6 +277,78 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
               >
                 {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* Colores (opcional) */}
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Variantes de color</p>
+              <p className="text-xs text-slate-400 mt-0.5">Opcional — solo si el producto se maneja por colores</p>
+            </div>
+
+            {/* Colores añadidos */}
+            {coloresDraft.length > 0 && (
+              <div className="space-y-1.5">
+                {coloresDraft.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                      <span className="text-sm font-medium text-slate-700">{c.nombre}</span>
+                      <span className="text-xs text-slate-400">stock 0 al inicio</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setColoresDraft(prev => prev.filter((_, j) => j !== i))}
+                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Paleta + campo nombre */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {COLOR_PALETTE.map(p => (
+                  <button
+                    key={p.hex}
+                    type="button"
+                    onClick={() => { setNuevoColorHex(p.hex); setNuevoColorNombre(p.nombre); setColorError('') }}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === p.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
+                    style={{ backgroundColor: p.hex }}
+                    title={p.nombre}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevoColorNombre}
+                  onChange={e => { setNuevoColorNombre(e.target.value); setColorError('') }}
+                  placeholder="Nombre del color"
+                  className="flex-1 h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!nuevoColorNombre.trim()) { setColorError('Escribe el nombre'); return }
+                    if (coloresDraft.some(c => c.nombre.toLowerCase() === nuevoColorNombre.trim().toLowerCase())) {
+                      setColorError('Ya existe ese color'); return
+                    }
+                    setColoresDraft(prev => [...prev, { nombre: nuevoColorNombre.trim(), hex: nuevoColorHex }])
+                    setNuevoColorNombre('')
+                    setColorError('')
+                  }}
+                  className="h-9 px-3 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Agregar
+                </button>
+              </div>
+              {colorError && <p className="text-xs text-red-500">{colorError}</p>}
             </div>
           </div>
 
