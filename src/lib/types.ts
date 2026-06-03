@@ -131,6 +131,21 @@ export interface Venta {
   created_at:     string
 }
 
+// ── Corte de caja ─────────────────────────────────────────────
+export interface CorteCaja {
+  id:                 string
+  cajero_id:          string | null
+  efectivo_esperado:  number
+  efectivo_contado:   number
+  diferencia:         number
+  total_ventas:       number
+  total_efectivo:     number
+  total_tarjeta:      number
+  num_transacciones:  number
+  notas:              string | null
+  created_at:         string
+}
+
 export interface VentaItem {
   id:              string
   venta_id:        string
