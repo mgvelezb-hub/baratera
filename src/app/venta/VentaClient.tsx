@@ -485,11 +485,12 @@ export default function VentaClient() {
     const { data: ventaData, error: ventaError } = await supabase
       .from('ventas')
       .insert({
-        total:          totalCarrito(carrito),
-        metodo:         payment.metodo,
-        monto_efectivo: payment.montoEfectivo,
-        monto_tarjeta:  payment.montoTarjeta,
-        cambio:         payment.cambio,
+        total:               totalCarrito(carrito),
+        metodo:              payment.metodo,
+        monto_efectivo:      payment.montoEfectivo,
+        monto_tarjeta:       payment.montoTarjeta,
+        monto_transferencia: payment.montoTransferencia,
+        cambio:              payment.cambio,
         cajero_id:      user?.id ?? null,
       })
       .select('id')

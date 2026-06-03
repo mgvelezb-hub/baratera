@@ -121,29 +121,31 @@ export const TIPOS_MOVIMIENTO: Record<MovimientoTipo, { label: string; signo: 1 
 
 // ── Ventas ────────────────────────────────────────────────────
 export interface Venta {
-  id:             string
-  total:          number
-  metodo:         'efectivo' | 'tarjeta' | 'mixto'
-  monto_efectivo: number
-  monto_tarjeta:  number
-  cambio:         number
-  cajero_id:      string | null
-  created_at:     string
+  id:                  string
+  total:               number
+  metodo:              'efectivo' | 'tarjeta' | 'transferencia' | 'mixto'
+  monto_efectivo:      number
+  monto_tarjeta:       number
+  monto_transferencia: number
+  cambio:              number
+  cajero_id:           string | null
+  created_at:          string
 }
 
 // ── Corte de caja ─────────────────────────────────────────────
 export interface CorteCaja {
-  id:                 string
-  cajero_id:          string | null
-  efectivo_esperado:  number
-  efectivo_contado:   number
-  diferencia:         number
-  total_ventas:       number
-  total_efectivo:     number
-  total_tarjeta:      number
-  num_transacciones:  number
-  notas:              string | null
-  created_at:         string
+  id:                   string
+  cajero_id:            string | null
+  efectivo_esperado:    number
+  efectivo_contado:     number
+  diferencia:           number
+  total_ventas:         number
+  total_efectivo:       number
+  total_tarjeta:        number
+  total_transferencia:  number
+  num_transacciones:    number
+  notas:                string | null
+  created_at:           string
 }
 
 export interface VentaItem {
