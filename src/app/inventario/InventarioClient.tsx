@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Search, AlertTriangle, Package, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Producto } from '@/lib/types'
+import type { Producto, ProductoColor } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import ProductoCard from '@/components/ProductoCard'
@@ -13,6 +13,7 @@ type FiltroSemaforo = 'todos' | 'rojo' | 'amarillo' | 'verde'
 
 export default function InventarioClient() {
   const [productos, setProductos] = useState<Producto[]>([])
+  const [coloresMap, setColoresMap] = useState<Map<string, ProductoColor[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroSemaforo>('todos')
@@ -21,13 +22,18 @@ export default function InventarioClient() {
 
   const fetchProductos = useCallback(async () => {
     const supabase = createClient()
-    const { data } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('activo', true)
-      .order('nombre')
-
-    setProductos(data ?? [])
+    const [{ data: prods }, { data: cols }] = await Promise.all([
+      supabase.from('productos').select('*').eq('activo', true).order('nombre'),
+      supabase.from('producto_colores').select('*').order('nombre'),
+    ])
+    setProductos(prods ?? [])
+    const map = new Map<string, ProductoColor[]>()
+    for (const c of (cols ?? [])) {
+      const arr = map.get(c.producto_id) ?? []
+      arr.push(c)
+      map.set(c.producto_id, arr)
+    }
+    setColoresMap(map)
     setLoading(false)
   }, [])
 
@@ -162,6 +168,7 @@ export default function InventarioClient() {
             <ProductoCard
               key={producto.id}
               producto={producto}
+              colores={coloresMap.get(producto.id) ?? []}
               isAdmin={isAdmin}
               onRefresh={fetchProductos}
             />

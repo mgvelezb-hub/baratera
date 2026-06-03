@@ -1,9 +1,25 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Loader2, Trash2, AlertOctagon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Producto } from '@/lib/types'
+import type { Producto, ProductoColor } from '@/lib/types'
+
+// Paleta de colores presets
+const COLOR_PALETTE = [
+  { nombre: 'Rojo',      hex: '#ef4444' },
+  { nombre: 'Naranja',   hex: '#f97316' },
+  { nombre: 'Amarillo',  hex: '#eab308' },
+  { nombre: 'Verde',     hex: '#22c55e' },
+  { nombre: 'Azul',      hex: '#3b82f6' },
+  { nombre: 'Morado',    hex: '#a855f7' },
+  { nombre: 'Rosa',      hex: '#ec4899' },
+  { nombre: 'Negro',     hex: '#1e293b' },
+  { nombre: 'Blanco',    hex: '#f8fafc' },
+  { nombre: 'Gris',      hex: '#94a3b8' },
+  { nombre: 'Café',      hex: '#92400e' },
+  { nombre: 'Turquesa',  hex: '#06b6d4' },
+]
 
 const UNIDADES   = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
 const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
@@ -20,6 +36,46 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   const [confirmDesact,   setConfirmDesact]   = useState(false)
   const [confirmEliminar, setConfirmEliminar] = useState(false)
   const [dangerLoading,   setDangerLoading]   = useState(false)
+
+  // Colores
+  const [colores,         setColores]         = useState<ProductoColor[]>([])
+  const [nuevoColorHex,   setNuevoColorHex]   = useState(COLOR_PALETTE[0].hex)
+  const [nuevoColorNombre,setNuevoColorNombre]= useState('')
+  const [colorLoading,    setColorLoading]    = useState(false)
+  const [colorError,      setColorError]      = useState('')
+
+  useEffect(() => {
+    createClient()
+      .from('producto_colores')
+      .select('*')
+      .eq('producto_id', producto.id)
+      .order('nombre')
+      .then(({ data }) => setColores(data ?? []))
+  }, [producto.id])
+
+  async function agregarColor() {
+    if (!nuevoColorNombre.trim()) { setColorError('Escribe el nombre del color'); return }
+    if (colores.some(c => c.nombre.toLowerCase() === nuevoColorNombre.trim().toLowerCase())) {
+      setColorError('Ya existe ese color'); return
+    }
+    setColorLoading(true)
+    setColorError('')
+    const { data, error: err } = await createClient()
+      .from('producto_colores')
+      .insert({ producto_id: producto.id, nombre: nuevoColorNombre.trim(), hex: nuevoColorHex, stock: 0 })
+      .select()
+      .single()
+    if (err) { setColorError('Error al agregar color'); setColorLoading(false); return }
+    setColores(prev => [...prev, data])
+    setNuevoColorNombre('')
+    setColorLoading(false)
+  }
+
+  async function eliminarColor(color: ProductoColor) {
+    if (color.stock > 0) { setColorError(`No puedes eliminar "${color.nombre}" mientras tenga stock (${color.stock})`); return }
+    await createClient().from('producto_colores').delete().eq('id', color.id)
+    setColores(prev => prev.filter(c => c.id !== color.id))
+  }
 
   const [form, setForm] = useState({
     nombre:          producto.nombre,
@@ -260,21 +316,71 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
           )}
 
           <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 h-11 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
+            <button type="button" onClick={onClose}
+              className="flex-1 h-11 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 h-11 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={loading}
+              className="flex-1 h-11 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Guardando...' : 'Guardar cambios'}
             </button>
+          </div>
+
+          {/* ── Colores (variantes opcionales) ───────────── */}
+          <div className="border-t border-slate-100 pt-5 space-y-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Variantes de color</p>
+            <p className="text-xs text-slate-400">Activa colores solo si este producto se maneja por tonos distintos (cuadernos, plumas, etc.)</p>
+
+            {/* Colores existentes */}
+            {colores.length > 0 && (
+              <div className="space-y-1.5">
+                {colores.map(c => (
+                  <div key={c.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                      <span className="text-sm font-medium text-slate-700">{c.nombre}</span>
+                      <span className="text-xs text-slate-400">{c.stock} en stock</span>
+                    </div>
+                    <button type="button" onClick={() => eliminarColor(c)}
+                      className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Agregar color */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {COLOR_PALETTE.map(p => (
+                  <button
+                    key={p.hex}
+                    type="button"
+                    onClick={() => { setNuevoColorHex(p.hex); setNuevoColorNombre(p.nombre) }}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === p.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
+                    style={{ backgroundColor: p.hex }}
+                    title={p.nombre}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevoColorNombre}
+                  onChange={e => { setNuevoColorNombre(e.target.value); setColorError('') }}
+                  placeholder="Nombre del color"
+                  className="flex-1 h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button type="button" onClick={agregarColor} disabled={colorLoading}
+                  className="h-9 px-3 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-lg flex items-center gap-1 transition-colors">
+                  <Plus className="w-3.5 h-3.5" />
+                  Agregar
+                </button>
+              </div>
+              {colorError && <p className="text-xs text-red-500">{colorError}</p>}
+            </div>
           </div>
 
           {/* ── Danger zone ───────────────────────────────── */}

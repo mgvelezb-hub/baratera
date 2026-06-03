@@ -11,6 +11,7 @@ export interface TicketItem {
   cantidadPiezas: number
   unidad:         string
   subtotal:       number
+  colorNombre?:   string | null
 }
 
 interface Props {
@@ -68,8 +69,11 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   const [emailSent,    setEmailSent]    = useState(false)
   const [emailError,   setEmailError]   = useState('')
 
-  const metodoLabel = payment.metodo === 'efectivo' ? 'Efectivo'
-    : payment.metodo === 'tarjeta' ? 'Tarjeta' : 'Efectivo + Tarjeta'
+  const metodoLabel =
+    payment.metodo === 'efectivo'      ? 'Efectivo'
+    : payment.metodo === 'tarjeta'     ? 'Tarjeta'
+    : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
+    : 'Efectivo + Tarjeta'
 
   // ── Print — ventana popup, misma lógica que imprimía completo
   function handlePrint() {
@@ -169,13 +173,14 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} cajas`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} piezas`)
+              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja${item.cantidadCajas !== 1 ? 's' : ''}`)
+              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
+              const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')
               return (
                 <div key={i} style={{ marginBottom: '4px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
-                    <span style={{ fontSize: '13px', color: '#000' }}>{parts.join(' + ')}</span>
+                    <span style={{ fontSize: '13px', color: '#000' }}>{descripcion}</span>
                     <span>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>

@@ -6,7 +6,7 @@ import {
   Package, Loader2, AlertTriangle, ChevronRight, Monitor,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Producto } from '@/lib/types'
+import type { Producto, ProductoColor } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
 import PaymentModal, { type PaymentData } from './PaymentModal'
@@ -14,9 +14,15 @@ import TicketPrint, { type TicketItem } from './TicketPrint'
 
 // ── Types ──────────────────────────────────────────────────────
 interface CartItem {
-  producto: Producto
+  producto:      Producto
   cantidadCajas: number
   cantidadPiezas: number
+  colorNombre?:  string | null   // null = sin variante de color
+  colorStock?:   number          // stock disponible del color seleccionado
+}
+
+function cartKey(item: CartItem): string {
+  return `${item.producto.id}-${item.colorNombre ?? ''}`
 }
 
 interface VentaExitosa {
@@ -56,7 +62,8 @@ function maxCajas(p: Producto): number {
 }
 
 function maxPiezas(item: CartItem): number {
-  return item.producto.stock_fisico - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
+  const stock = item.colorStock ?? item.producto.stock_fisico
+  return stock - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
 }
 
 function toTicketItems(items: CartItem[]): TicketItem[] {
@@ -66,6 +73,7 @@ function toTicketItems(items: CartItem[]): TicketItem[] {
     cantidadPiezas: item.cantidadPiezas,
     unidad:         item.producto.unidad,
     subtotal:       subtotalItem(item),
+    colorNombre:    item.colorNombre ?? null,
   }))
 }
 
@@ -73,11 +81,13 @@ function toTicketItems(items: CartItem[]): TicketItem[] {
 function ProductoCardPOS({
   producto,
   itemEnCarrito,
+  tieneColores = false,
   onAgregar,
 }: {
-  producto: Producto
+  producto:      Producto
   itemEnCarrito: CartItem | undefined
-  onAgregar: () => void
+  tieneColores?: boolean
+  onAgregar:     () => void
 }) {
   const semaforo  = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
   const sinStock  = producto.stock_fisico <= 0
@@ -124,15 +134,69 @@ function ProductoCardPOS({
             )}
           </div>
         </div>
-        <div className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-          semaforo === 'rojo' ? 'bg-red-100 text-red-700' :
-          semaforo === 'amarillo' ? 'bg-amber-100 text-amber-700' :
-          'bg-green-100 text-green-700'
-        }`}>
-          {producto.stock_fisico} {producto.unidad}
+        <div className="flex flex-col items-end gap-1">
+          <div className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+            semaforo === 'rojo' ? 'bg-red-100 text-red-700' :
+            semaforo === 'amarillo' ? 'bg-amber-100 text-amber-700' :
+            'bg-green-100 text-green-700'
+          }`}>
+            {producto.stock_fisico} {producto.unidad}
+          </div>
+          {tieneColores && (
+            <span className="text-[10px] text-violet-500 font-medium">Elige color ▸</span>
+          )}
         </div>
       </div>
     </button>
+  )
+}
+
+// ── Color picker modal ─────────────────────────────────────────
+function ColorPickerModal({
+  producto,
+  colores,
+  onClose,
+  onSelect,
+}: {
+  producto: Producto
+  colores:  ProductoColor[]
+  onClose:  () => void
+  onSelect: (color: ProductoColor) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl">
+        <div className="flex items-center justify-between p-5 pb-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Selecciona el color</h2>
+            <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{producto.nombre}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-2">
+          {colores.map(c => (
+            <button
+              key={c.id}
+              onClick={() => onSelect(c)}
+              disabled={c.stock <= 0}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                c.stock <= 0
+                  ? 'border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed'
+                  : 'border-slate-200 hover:border-violet-400 hover:bg-violet-50 active:scale-[0.97]'
+              }`}
+            >
+              <span className="w-6 h-6 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{c.nombre}</p>
+                <p className="text-xs text-slate-400">{c.stock} en stock</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -206,14 +270,19 @@ function CartItemRow({
     p.precio_mayoreo && p.umbral_mayoreo &&
     item.cantidadPiezas >= p.umbral_mayoreo
 
+  const key = cartKey(item)
+
   return (
     <li className="py-3">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-sm font-semibold text-slate-900 leading-tight flex-1 line-clamp-2">
-          {p.nombre}
-        </p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-900 leading-tight line-clamp-2">{p.nombre}</p>
+          {item.colorNombre && (
+            <p className="text-xs text-violet-600 mt-0.5">● {item.colorNombre}</p>
+          )}
+        </div>
         <button
-          onClick={() => onEliminar(p.id)}
+          onClick={() => onEliminar(key)}
           className="shrink-0 p-1 rounded hover:bg-slate-100 text-slate-400"
         >
           <X className="w-3.5 h-3.5" />
@@ -227,7 +296,7 @@ function CartItemRow({
             <Stepper
               value={item.cantidadCajas}
               max={maxCajas(p)}
-              onChange={v => onSetCajas(p.id, v)}
+              onChange={v => onSetCajas(key, v)}
               color="amber"
               label="caja"
             />
@@ -242,7 +311,7 @@ function CartItemRow({
             <Stepper
               value={item.cantidadPiezas}
               max={maxPiezas(item)}
-              onChange={v => onSetPiezas(p.id, v)}
+              onChange={v => onSetPiezas(key, v)}
               color="slate"
               label="pza"
             />
@@ -263,8 +332,8 @@ function CartItemRow({
         <div className="flex items-center justify-between gap-3">
           <Stepper
             value={item.cantidadPiezas}
-            max={p.stock_fisico}
-            onChange={v => onSetPiezas(p.id, v)}
+            max={item.colorStock ?? p.stock_fisico}
+            onChange={v => onSetPiezas(key, v)}
             color="slate"
             label={p.unidad}
           />
@@ -314,7 +383,7 @@ function CarritoPanel({
       <ul className="flex-1 overflow-y-auto divide-y divide-slate-100 px-4">
         {carrito.map(item => (
           <CartItemRow
-            key={item.producto.id}
+            key={cartKey(item)}
             item={item}
             onSetCajas={onSetCajas}
             onSetPiezas={onSetPiezas}
@@ -345,15 +414,17 @@ function CarritoPanel({
 
 // ── Main ───────────────────────────────────────────────────────
 export default function VentaClient() {
-  const [productos,    setProductos]    = useState<Producto[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [search,       setSearch]       = useState('')
-  const [carrito,      setCarrito]      = useState<CartItem[]>([])
-  const [showCarrito,  setShowCarrito]  = useState(false)
-  const [showPayment,  setShowPayment]  = useState(false)
-  const [confirmando,  setConfirmando]  = useState(false)
-  const [ventaExitosa, setVentaExitosa] = useState<VentaExitosa | null>(null)
-  const [error,        setError]        = useState('')
+  const [productos,      setProductos]      = useState<Producto[]>([])
+  const [coloresMap,     setColoresMap]     = useState<Map<string, ProductoColor[]>>(new Map())
+  const [loading,        setLoading]        = useState(true)
+  const [search,         setSearch]         = useState('')
+  const [carrito,        setCarrito]        = useState<CartItem[]>([])
+  const [colorPickerProd,setColorPickerProd]= useState<Producto | null>(null)
+  const [showCarrito,    setShowCarrito]    = useState(false)
+  const [showPayment,    setShowPayment]    = useState(false)
+  const [confirmando,    setConfirmando]    = useState(false)
+  const [ventaExitosa,   setVentaExitosa]   = useState<VentaExitosa | null>(null)
+  const [error,          setError]          = useState('')
   const channelRef      = useRef<BroadcastChannel | null>(null)
   // Prevents the cart-empty effect from overwriting the 'complete'
   // screen on the customer display right after a sale is confirmed.
@@ -384,12 +455,19 @@ export default function VentaClient() {
   }, [carrito])
 
   const fetchProductos = useCallback(async () => {
-    const { data } = await createClient()
-      .from('productos')
-      .select('*')
-      .eq('activo', true)
-      .order('nombre')
-    setProductos(data ?? [])
+    const supabase = createClient()
+    const [{ data: prods }, { data: cols }] = await Promise.all([
+      supabase.from('productos').select('*').eq('activo', true).order('nombre'),
+      supabase.from('producto_colores').select('*').order('nombre'),
+    ])
+    setProductos(prods ?? [])
+    const map = new Map<string, ProductoColor[]>()
+    for (const c of (cols ?? [])) {
+      const arr = map.get(c.producto_id) ?? []
+      arr.push(c)
+      map.set(c.producto_id, arr)
+    }
+    setColoresMap(map)
     setLoading(false)
   }, [])
 
@@ -407,14 +485,23 @@ export default function VentaClient() {
     }),
   [productos, search])
 
-  function itemEnCarrito(productoId: string): CartItem | undefined {
-    return carrito.find(i => i.producto.id === productoId)
+  function itemEnCarrito(productoId: string, colorNombre?: string | null): CartItem | undefined {
+    return carrito.find(i =>
+      i.producto.id === productoId &&
+      (i.colorNombre ?? null) === (colorNombre ?? null)
+    )
   }
 
   function agregarAlCarrito(producto: Producto) {
     if (producto.stock_fisico <= 0) return
+    const colores = coloresMap.get(producto.id) ?? []
+    if (colores.length > 0) {
+      // Producto con variantes: mostrar selector de color
+      setColorPickerProd(producto)
+      return
+    }
     setCarrito(prev => {
-      const idx = prev.findIndex(i => i.producto.id === producto.id)
+      const idx = prev.findIndex(i => i.producto.id === producto.id && !i.colorNombre)
       if (idx >= 0) {
         const item = prev[idx]
         if (item.cantidadPiezas >= maxPiezas(item)) return prev
@@ -426,13 +513,30 @@ export default function VentaClient() {
     })
   }
 
-  function setCantidadCajas(productoId: string, valor: number) {
+  function agregarAlCarritoConColor(producto: Producto, color: ProductoColor) {
+    setColorPickerProd(null)
+    if (color.stock <= 0) return
+    setCarrito(prev => {
+      const idx = prev.findIndex(i => i.producto.id === producto.id && i.colorNombre === color.nombre)
+      if (idx >= 0) {
+        const item = prev[idx]
+        if (item.cantidadPiezas >= maxPiezas(item)) return prev
+        const updated = [...prev]
+        updated[idx] = { ...item, cantidadPiezas: item.cantidadPiezas + 1 }
+        return updated
+      }
+      return [...prev, { producto, cantidadCajas: 0, cantidadPiezas: 1, colorNombre: color.nombre, colorStock: color.stock }]
+    })
+  }
+
+  function setCantidadCajas(key: string, valor: number) {
     setCarrito(prev =>
       prev
         .map(i => {
-          if (i.producto.id !== productoId) return i
+          if (cartKey(i) !== key) return i
           const nueva = Math.max(0, Math.min(valor, maxCajas(i.producto)))
-          const piezasDisp = i.producto.stock_fisico - nueva * (i.producto.piezas_por_caja ?? 0)
+          const stockMax = i.colorStock ?? i.producto.stock_fisico
+          const piezasDisp = stockMax - nueva * (i.producto.piezas_por_caja ?? 0)
           const piezas = Math.min(i.cantidadPiezas, Math.max(0, piezasDisp))
           if (nueva === 0 && piezas === 0) return null
           return { ...i, cantidadCajas: nueva, cantidadPiezas: piezas }
@@ -441,11 +545,11 @@ export default function VentaClient() {
     )
   }
 
-  function setCantidadPiezas(productoId: string, valor: number) {
+  function setCantidadPiezas(key: string, valor: number) {
     setCarrito(prev =>
       prev
         .map(i => {
-          if (i.producto.id !== productoId) return i
+          if (cartKey(i) !== key) return i
           const nueva = Math.max(0, Math.min(valor, maxPiezas(i)))
           if (nueva === 0 && i.cantidadCajas === 0) return null
           return { ...i, cantidadPiezas: nueva }
@@ -454,8 +558,8 @@ export default function VentaClient() {
     )
   }
 
-  function eliminarDelCarrito(productoId: string) {
-    setCarrito(prev => prev.filter(i => i.producto.id !== productoId))
+  function eliminarDelCarrito(key: string) {
+    setCarrito(prev => prev.filter(i => cartKey(i) !== key))
   }
 
   async function confirmarVenta(payment: PaymentData) {
@@ -470,7 +574,7 @@ export default function VentaClient() {
       .select('id, stock_fisico, nombre')
       .in('id', carrito.map(i => i.producto.id))
 
-    // Stock validation
+    // Stock validation — para colores validar contra producto_colores
     for (const item of carrito) {
       const actual = actuales?.find(p => p.id === item.producto.id)
       const piezas = piezasReales(item)
@@ -478,6 +582,14 @@ export default function VentaClient() {
         setError(`Sin stock suficiente: ${actual?.nombre ?? item.producto.nombre}`)
         setConfirmando(false)
         return
+      }
+      if (item.colorNombre) {
+        const colorStock = item.colorStock ?? 0
+        if (colorStock < piezas) {
+          setError(`Sin stock del color "${item.colorNombre}" para: ${item.producto.nombre}`)
+          setConfirmando(false)
+          return
+        }
       }
     }
 
@@ -527,16 +639,28 @@ export default function VentaClient() {
       if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.producto.unidad}`)
 
       await supabase.from('stock_ledger').insert({
-        producto_id: item.producto.id,
-        tipo:        'salida_venta_manual',
-        qty_antes:   actual.stock_fisico,
-        qty_despues: nuevoStock,
-        notas:       `[pos] ${parts.join(' + ')} · ${payment.metodo} · ${user?.email ?? 'desconocido'}`,
-        canal:       'pos',
-        usuario_id:  user?.id ?? null,
+        producto_id:    item.producto.id,
+        tipo:           'salida_venta_manual',
+        qty_antes:      actual.stock_fisico,
+        qty_despues:    nuevoStock,
+        notas:          `[pos] ${parts.join(' + ')} · ${payment.metodo} · ${user?.email ?? 'desconocido'}`,
+        canal:          'pos',
+        usuario_id:     user?.id ?? null,
+        color_variante: item.colorNombre ?? null,
       })
 
       await supabase.from('productos').update({ stock_fisico: nuevoStock }).eq('id', item.producto.id)
+
+      // Actualizar stock de la variante de color
+      if (item.colorNombre) {
+        const colorRow = (coloresMap.get(item.producto.id) ?? []).find(c => c.nombre === item.colorNombre)
+        if (colorRow) {
+          await supabase
+            .from('producto_colores')
+            .update({ stock: Math.max(0, colorRow.stock - piezas) })
+            .eq('id', colorRow.id)
+        }
+      }
     }
 
     const ventaTotal = totalCarrito(carrito)
@@ -613,6 +737,7 @@ export default function VentaClient() {
                   key={p.id}
                   producto={p}
                   itemEnCarrito={itemEnCarrito(p.id)}
+                  tieneColores={(coloresMap.get(p.id) ?? []).length > 0}
                   onAgregar={() => agregarAlCarrito(p)}
                 />
               ))}
@@ -728,6 +853,16 @@ export default function VentaClient() {
         </>
       )}
     </div>
+
+    {/* ── Color picker modal ──────────────────────────────── */}
+    {colorPickerProd && (
+      <ColorPickerModal
+        producto={colorPickerProd}
+        colores={coloresMap.get(colorPickerProd.id) ?? []}
+        onClose={() => setColorPickerProd(null)}
+        onSelect={color => agregarAlCarritoConColor(colorPickerProd, color)}
+      />
+    )}
 
     {/* ── Payment modal ────────────────────────────────────── */}
     {showPayment && (

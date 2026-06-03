@@ -119,6 +119,16 @@ export const TIPOS_MOVIMIENTO: Record<MovimientoTipo, { label: string; signo: 1 
   devolucion: { label: 'Devolución', signo: 1, color: 'text-purple-600' },
 }
 
+// ── Colores por producto ──────────────────────────────────────
+export interface ProductoColor {
+  id:          string
+  producto_id: string
+  nombre:      string
+  hex:         string
+  stock:       number
+  created_at:  string
+}
+
 // ── Ventas ────────────────────────────────────────────────────
 export interface Venta {
   id:                  string

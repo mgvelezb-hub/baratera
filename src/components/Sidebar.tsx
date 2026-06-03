@@ -13,16 +13,14 @@ import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { cn } from '@/lib/utils'
 
 const MODULES = [
-  { id: 'inventario', label: 'Inventario',   href: '/inventario', icon: Package,       built: true,  adminOnly: false },
-  { id: 'venta',      label: 'Venta física', href: '/venta',      icon: ShoppingCart,  built: true,  adminOnly: false },
-  { id: 'pedidos',    label: 'Pedidos',       href: '/pedidos',    icon: ClipboardList, built: false, adminOnly: false },
-  { id: 'tienda',     label: 'Tienda online', href: '/tienda',     icon: Globe,         built: false, adminOnly: false },
-  { id: 'chatbot',    label: 'Chatbot',       href: '/chatbot',    icon: MessageCircle, built: false, adminOnly: false },
-  { id: 'clientes',   label: 'Clientes',      href: '/clientes',   icon: Users,         built: false, adminOnly: false },
+  { id: 'inventario',  label: 'Inventario',    href: '/inventario',  icon: Package,      built: true,  adminOnly: false },
+  { id: 'venta',       label: 'Venta física',  href: '/venta',       icon: ShoppingCart, built: true,  adminOnly: false },
   { id: 'corte',       label: 'Corte de caja', href: '/corte',       icon: Scissors,     built: true,  adminOnly: true  },
   { id: 'proveedores', label: 'Proveedores',   href: '/proveedores', icon: Building2,    built: true,  adminOnly: true  },
   { id: 'costos',      label: 'Costos',        href: '/costos',      icon: Receipt,      built: true,  adminOnly: true  },
   { id: 'dashboard',   label: 'Dashboard',     href: '/dashboard',   icon: BarChart3,    built: true,  adminOnly: true  },
+  { id: 'pedidos',     label: 'Pedidos',       href: '/pedidos',     icon: ClipboardList,built: false, adminOnly: false },
+  { id: 'clientes',    label: 'Clientes',      href: '/clientes',    icon: Users,        built: false, adminOnly: false },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {

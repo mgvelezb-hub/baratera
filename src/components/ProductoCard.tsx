@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { MoreVertical, Plus, Pencil } from 'lucide-react'
-import type { Producto } from '@/lib/types'
+import type { Producto, ProductoColor } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
 import { formatMXN } from '@/lib/utils'
 import SemaforoBadge from './Semaforobadge'
@@ -11,15 +11,17 @@ import MovimientoModal from './MovimientoModal'
 import EditarProductoModal from '@/app/inventario/EditarProductoModal'
 
 interface Props {
-  producto: Producto
-  isAdmin: boolean
+  producto:  Producto
+  colores?:  ProductoColor[]
+  isAdmin:   boolean
   onRefresh: () => void
 }
 
-export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
-  const [showMenu,  setShowMenu]  = useState(false)
-  const [showEditar, setShowEditar] = useState(false)
-  const [modalTipo,  setModalTipo]  = useState<'entrada_compra' | null>(null)
+export default function ProductoCard({ producto, colores = [], isAdmin, onRefresh }: Props) {
+  const [showMenu,       setShowMenu]       = useState(false)
+  const [showEditar,     setShowEditar]     = useState(false)
+  const [modalTipo,      setModalTipo]      = useState<'entrada_compra' | null>(null)
+  const [colorActivo,    setColorActivo]    = useState<ProductoColor | null>(null)
 
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
 
@@ -105,11 +107,11 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
                 semaforo === 'amarillo' ? 'text-amber-600' :
                 'text-slate-900'
               }`}>
-                {producto.stock_fisico}
+                {colorActivo ? colorActivo.stock : producto.stock_fisico}
                 <span className="text-sm font-normal text-slate-400 ml-1">{producto.unidad}</span>
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                Mínimo: {producto.stock_minimo} {producto.unidad}
+                {colorActivo ? `${colorActivo.nombre} · mín ${producto.stock_minimo}` : `Mínimo: ${producto.stock_minimo} ${producto.unidad}`}
               </p>
             </div>
             <div className="text-right">
@@ -119,12 +121,31 @@ export default function ProductoCard({ producto, isAdmin, onRefresh }: Props) {
               )}
             </div>
           </div>
+
+          {/* Swatches de colores */}
+          {colores.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-100">
+              {colores.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setColorActivo(colorActivo?.id === c.id ? null : c)}
+                  title={`${c.nombre}: ${c.stock} en stock`}
+                  className={`w-5 h-5 rounded-full border-2 transition-all ${
+                    colorActivo?.id === c.id ? 'border-violet-500 scale-125' : 'border-white shadow-sm'
+                  } ${c.stock === 0 ? 'opacity-30' : ''}`}
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {modalTipo && (
         <MovimientoModal
           producto={producto}
+          colores={colores}
           defaultTipo={modalTipo}
           onClose={() => setModalTipo(null)}
           onSuccess={handleMovimientoSuccess}
