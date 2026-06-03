@@ -19,6 +19,22 @@ export function formatFecha(dateStr: string): string {
   }).format(new Date(dateStr))
 }
 
+// Pluraliza unidades de medida para el ticket y pantalla cliente.
+// Unidades abreviadas (kg, lt) no cambian.
+export function pluralUnidad(unidad: string, cantidad: number): string {
+  if (cantidad === 1) return unidad
+  const map: Record<string, string> = {
+    caja:     'cajas',
+    pza:      'pzas',
+    paquete:  'paquetes',
+    rollo:    'rollos',
+    resma:    'resmas',
+    par:      'pares',
+    juego:    'juegos',
+  }
+  return map[unidad] ?? unidad   // kg, lt y desconocidos no cambian
+}
+
 export function formatFechaCorta(dateStr: string): string {
   return new Intl.DateTimeFormat('es-MX', {
     day: '2-digit',

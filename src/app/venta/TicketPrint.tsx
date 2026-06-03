@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Printer, Mail, Phone, X } from 'lucide-react'
-import { formatMXN } from '@/lib/utils'
+import { formatMXN, pluralUnidad } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
 
 export interface TicketItem {
@@ -173,8 +173,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja${item.cantidadCajas !== 1 ? 's' : ''}`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${item.unidad}`)
+              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
+              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
               const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')
               return (
                 <div key={i} style={{ marginBottom: '4px' }}>
