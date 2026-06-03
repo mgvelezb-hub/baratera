@@ -3,17 +3,21 @@
 import { useState } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { Proveedor } from '@/lib/types'
 
 interface Props {
-  onClose:   () => void
-  onSuccess: () => void
+  proveedor?: Proveedor
+  onClose:    () => void
+  onSuccess:  () => void
 }
 
-export default function NuevoProveedorModal({ onClose, onSuccess }: Props) {
-  const [nombre,   setNombre]   = useState('')
-  const [contacto, setContacto] = useState('')
-  const [tel,      setTel]      = useState('')
-  const [notas,    setNotas]    = useState('')
+export default function NuevoProveedorModal({ proveedor, onClose, onSuccess }: Props) {
+  const editando = !!proveedor
+
+  const [nombre,   setNombre]   = useState(proveedor?.nombre          ?? '')
+  const [contacto, setContacto] = useState(proveedor?.contacto_nombre ?? '')
+  const [tel,      setTel]      = useState(proveedor?.contacto_tel    ?? '')
+  const [notas,    setNotas]    = useState(proveedor?.notas           ?? '')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
@@ -21,12 +25,19 @@ export default function NuevoProveedorModal({ onClose, onSuccess }: Props) {
     e.preventDefault()
     if (!nombre.trim()) { setError('El nombre es requerido'); return }
     setLoading(true)
-    const { error: err } = await createClient().from('proveedores').insert({
+
+    const payload = {
       nombre:          nombre.trim(),
       contacto_nombre: contacto.trim() || null,
-      contacto_tel:    tel.trim() || null,
-      notas:           notas.trim() || null,
-    })
+      contacto_tel:    tel.trim()      || null,
+      notas:           notas.trim()    || null,
+    }
+
+    const supabase = createClient()
+    const { error: err } = editando
+      ? await supabase.from('proveedores').update(payload).eq('id', proveedor.id)
+      : await supabase.from('proveedores').insert(payload)
+
     if (err) { setError('Error al guardar. Intenta de nuevo.'); setLoading(false); return }
     onSuccess()
   }
@@ -36,7 +47,9 @@ export default function NuevoProveedorModal({ onClose, onSuccess }: Props) {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl">
 
         <div className="flex items-center justify-between p-5 pb-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-900">Nuevo proveedor</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            {editando ? 'Editar proveedor' : 'Nuevo proveedor'}
+          </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
             <X className="w-4 h-4" />
           </button>
@@ -58,7 +71,7 @@ export default function NuevoProveedorModal({ onClose, onSuccess }: Props) {
             <button type="submit" disabled={loading}
               className="flex-1 h-11 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Guardando...' : 'Guardar'}
+              {loading ? 'Guardando...' : editando ? 'Guardar cambios' : 'Guardar'}
             </button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Building2, CheckCircle2 } from 'lucide-react'
+import { Plus, Building2, CheckCircle2, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Proveedor, Adeudo } from '@/lib/types'
 import NuevoProveedorModal from './NuevoProveedorModal'
@@ -38,6 +38,7 @@ export default function ProveedoresClient({ proveedoresIniciales, adeudosInicial
   const [adeudos,         setAdeudos]         = useState(adeudosIniciales)
   const [filtro,          setFiltro]          = useState<Filtro>('todos')
   const [showNewProv,     setShowNewProv]     = useState(false)
+  const [showEditProv,    setShowEditProv]    = useState(false)
   const [showAdeudo,      setShowAdeudo]      = useState(false)
   const [proveedorActivo, setProveedorActivo] = useState<Proveedor | null>(null)
 
@@ -268,6 +269,13 @@ export default function ProveedoresClient({ proveedoresIniciales, adeudosInicial
                       </span>
                     )}
                     <button
+                      onClick={() => { setProveedorActivo(p); setShowEditProv(true) }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      title="Editar proveedor"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => { setProveedorActivo(p); setShowAdeudo(true) }}
                       className="text-xs text-violet-600 hover:text-violet-800 font-semibold border border-violet-200 hover:border-violet-400 rounded-lg px-2.5 py-1 transition-colors"
                     >
@@ -286,6 +294,13 @@ export default function ProveedoresClient({ proveedoresIniciales, adeudosInicial
         <NuevoProveedorModal
           onClose={() => setShowNewProv(false)}
           onSuccess={() => { setShowNewProv(false); refresh() }}
+        />
+      )}
+      {showEditProv && proveedorActivo && (
+        <NuevoProveedorModal
+          proveedor={proveedorActivo}
+          onClose={() => { setShowEditProv(false); setProveedorActivo(null) }}
+          onSuccess={() => { setShowEditProv(false); setProveedorActivo(null); refresh() }}
         />
       )}
       {showAdeudo && proveedorActivo && (
