@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { error: resendError } = await resend.emails.send({
-      from:    'Baratera OS <onboarding@resend.dev>',
+      from:    'Baratera OS <sistema@lamasbaratera.com.mx>',
       to:      'lamasbaratera@gmail.com',
       subject: `⚠️ ${adeudos.length} adeudo${adeudos.length === 1 ? '' : 's'} venciendo — ${formatMXN(totalMonto)}`,
       html,

@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { error } = await resend.emails.send({
-      from:    'Papelería La Más Baratera <onboarding@resend.dev>',
+      from:    'Papelería La Más Baratera <tickets@lamasbaratera.com.mx>',
       to:      email,
       subject: `Tu ticket de compra — ${hora}`,
       html,
