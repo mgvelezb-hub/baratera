@@ -94,20 +94,28 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
       return
     }
 
+    let cleaned = false
+    function cleanup(): void {
+      if (cleaned) return
+      cleaned = true
+      if (iframe.parentNode) document.body.removeChild(iframe)
+    }
+
+    // Limpiar SOLO cuando el trabajo terminó. Remover el iframe antes
+    // (mientras la térmica aún alimenta papel) aborta la impresión.
+    win.onafterprint = cleanup
+
     doc.open()
     doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title></title><style>${PRINT_CSS}</style></head><body>${content}</body></html>`)
     doc.close()
 
-    function cleanup(): void {
-      setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe) }, 500)
-    }
-
-    win.onafterprint = cleanup
     setTimeout(() => {
       win.focus()
       win.print()
-      cleanup()
-    }, 300)
+      // Fallback por si onafterprint no dispara: el iframe es invisible,
+      // dejarlo 60s no molesta y garantiza que no se corte el trabajo.
+      setTimeout(cleanup, 60000)
+    }, 400)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
