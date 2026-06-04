@@ -170,29 +170,59 @@ export default function MovimientoModal({ producto, colores = [], onClose, onSuc
 
           {/* Color (si aplica) */}
           {tieneColores && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Color *</label>
-              <div className="flex flex-wrap gap-2">
-                {colores.map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => { setColorSeleccionado(c.nombre); setError('') }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-                      colorSeleccionado === c.nombre
-                        ? 'border-violet-400 bg-violet-50 text-violet-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0 border border-black/10"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    {c.nombre}
-                    <span className="text-xs text-slate-400 ml-0.5">({c.stock})</span>
-                  </button>
-                ))}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Color *</label>
+                <div className="flex flex-wrap gap-2">
+                  {colores.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => { setColorSeleccionado(c.nombre); setError('') }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                        colorSeleccionado === c.nombre
+                          ? 'border-violet-400 bg-violet-50 text-violet-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0 border border-black/10"
+                        style={{ backgroundColor: c.hex }}
+                      />
+                      {c.nombre}
+                      <span className="text-xs text-slate-400 ml-0.5">({c.stock})</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Detalle del color seleccionado */}
+              {colorSeleccionado && (() => {
+                const colorActual = colores.find(c => c.nombre === colorSeleccionado)
+                if (!colorActual) return null
+                return (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 space-y-2">
+                    <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: colorActual.hex }} />
+                      {colorActual.nombre}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="bg-white rounded-lg px-3 py-2 border border-violet-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Stock actual</p>
+                        <p className="font-bold text-slate-900">{colorActual.stock}</p>
+                      </div>
+                      <div className="bg-white rounded-lg px-3 py-2 border border-violet-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Stock mínimo</p>
+                        <p className="font-bold text-slate-900">{producto.stock_minimo}</p>
+                      </div>
+                      <div className="bg-white rounded-lg px-3 py-2 border border-violet-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Unidad</p>
+                        <p className="font-bold text-slate-900">{producto.unidad}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
 

@@ -178,7 +178,7 @@ function AgregarProductoModal({
 
   const [colorSel, setColorSel] = useState<ProductoColor | null>(null)
   const [cajas,    setCajas]    = useState(0)
-  const [piezas,   setPiezas]   = useState(tieneColores ? 0 : 1)
+  const [piezas,   setPiezas]   = useState(0)
 
   const stockDisp      = colorSel ? colorSel.stock : tieneColores ? 0 : producto.stock_fisico
   const maxCajasN      = tieneCaja && stockDisp > 0 ? Math.floor(stockDisp / producto.piezas_por_caja!) : 0
@@ -192,7 +192,7 @@ function AgregarProductoModal({
     if (c.stock <= 0) return
     setColorSel(c)
     setCajas(0)
-    setPiezas(1)
+    setPiezas(0)
   }
 
   function handleSetCajas(v: number) {
