@@ -199,6 +199,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
               <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
             </div>
+            <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.3, marginBottom: '2px' }}>
+              Calle Mesones 123, 2º piso (mano izquierda)<br />
+              Col. Centro, Cuauhtémoc, 06000, CDMX
+            </p>
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>lamasbaratera.com.mx</p>
             <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
 
