@@ -76,25 +76,26 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — popup simple (mecanismo original probado que SÍ imprime).
-  //    Escribe el ticket, enfoca, imprime y cierra. NO mide alto ni
-  //    inyecta un @page con tamaño: el largo lo gobierna el driver de la
-  //    impresora (Epson en modo Recibo/Rollo con corte automático).
-  //    Forzar el alto por CSS causaba cortes en tickets largos.
+  // ── Print — popup con script propio. Imprime en window.onload (el
+  //    layout ya está completo → no captura el ticket a medias) y cierra
+  //    en window.onafterprint (cuando TERMINA de imprimir), NUNCA de
+  //    inmediato: cerrar antes truncaba el spool en tickets largos
+  //    ("solo salía la primera parte"). Fallback de cierre a 30s.
+  //    SIN @page con tamaño: el largo lo gobierna el driver de la
+  //    impresora (ZKP5801, papel 58mm — usar tamaño "58mm roll" continuo).
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
     const win = window.open('', '_blank', 'width=400,height=700')
     if (!win) return
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
-      `<style>${PRINT_CSS}</style></head><body>${content}</body></html>`
+      `<style>${PRINT_CSS}</style></head><body>${content}` +
+      `<script>window.onafterprint=function(){window.close()};` +
+      `window.onload=function(){window.focus();window.print();` +
+      `setTimeout(function(){window.close()},30000)};<\/script>` +
+      `</body></html>`
     )
     win.document.close()
-    win.focus()
-    setTimeout(() => {
-      win.print()
-      win.close()
-    }, 500)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
