@@ -9,6 +9,10 @@ export function formatMXN(amount: number): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount)
 }
 
+export function formatNum(n: number): string {
+  return new Intl.NumberFormat('es-MX').format(n)
+}
+
 export function formatFecha(dateStr: string): string {
   return new Intl.DateTimeFormat('es-MX', {
     day: '2-digit',

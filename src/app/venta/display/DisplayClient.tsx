@@ -5,11 +5,13 @@ import { Package, CheckCircle2 } from 'lucide-react'
 import { formatMXN, pluralUnidad } from '@/lib/utils'
 
 export interface DisplayItem {
-  nombre:        string
-  cantidadCajas: number
+  nombre:         string
+  cantidadCajas:  number
   cantidadPiezas: number
-  unidad:        string
-  subtotal:      number
+  unidad:         string
+  subtotal:       number
+  colorNombre?:   string | null
+  ahorro?:        number
 }
 
 type DisplayState =
@@ -62,11 +64,22 @@ export default function DisplayClient() {
               {state.items.map((item, i) => {
                 const parts: string[] = []
                 if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
-                if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
+                if (item.cantidadPiezas > 0) {
+                  const uPzas = item.cantidadCajas > 0 ? 'pza' : item.unidad
+                  parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
+                }
+                const cantDesc = [parts.join(' + '), item.colorNombre ?? null].filter(Boolean).join(' · ')
                 return (
                   <tr key={i} className="text-slate-800">
                     <td className="py-4 text-base font-medium">{item.nombre}</td>
-                    <td className="py-4 text-center text-slate-500">{parts.join(' + ')}</td>
+                    <td className="py-4 text-center text-slate-500">
+                      <span>{cantDesc}</span>
+                      {(item.ahorro ?? 0) > 0 && (
+                        <span className="block text-sm text-green-600 font-semibold mt-0.5">
+                          Mayoreo · Ahorro: {formatMXN(item.ahorro!)}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-4 text-right font-semibold">{formatMXN(item.subtotal)}</td>
                   </tr>
                 )

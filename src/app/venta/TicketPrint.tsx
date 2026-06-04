@@ -12,6 +12,7 @@ export interface TicketItem {
   unidad:         string
   subtotal:       number
   colorNombre?:   string | null
+  ahorro?:        number
 }
 
 interface Props {
@@ -200,7 +201,12 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             {items.map((item, i) => {
               const parts: string[] = []
               if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
-              if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
+              if (item.cantidadPiezas > 0) {
+                // Si el ítem también tiene cajas, las piezas sueltas usan 'pza'
+                // para evitar que dos partes digan "caja" cuando unidad === 'caja'
+                const uPzas = item.cantidadCajas > 0 ? 'pza' : item.unidad
+                parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
+              }
               const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')
               return (
                 <div key={i} style={{ marginBottom: '5px' }}>

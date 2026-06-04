@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { MoreVertical, Plus, Pencil } from 'lucide-react'
 import type { Producto, ProductoColor } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
-import { formatMXN } from '@/lib/utils'
+import { formatMXN, formatNum } from '@/lib/utils'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
 import EditarProductoModal from '@/app/inventario/EditarProductoModal'
@@ -107,11 +107,11 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
                 semaforo === 'amarillo' ? 'text-amber-600' :
                 'text-slate-900'
               }`}>
-                {colorActivo ? colorActivo.stock : producto.stock_fisico}
+                {formatNum(colorActivo ? colorActivo.stock : producto.stock_fisico)}
                 <span className="text-sm font-normal text-slate-400 ml-1">{producto.unidad}</span>
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                {colorActivo ? `${colorActivo.nombre} · mín ${producto.stock_minimo}` : `Mínimo: ${producto.stock_minimo} ${producto.unidad}`}
+                {colorActivo ? `${colorActivo.nombre} · mín ${formatNum(producto.stock_minimo)}` : `Mínimo: ${formatNum(producto.stock_minimo)} ${producto.unidad}`}
               </p>
             </div>
             <div className="text-right">

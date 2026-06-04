@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatMXN } from '@/lib/utils'
+import { formatMXN, formatNum } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
 import PaymentModal, { type PaymentData } from './PaymentModal'
 import TicketPrint, { type TicketItem } from './TicketPrint'
@@ -66,6 +66,14 @@ function maxPiezas(item: CartItem): number {
   return stock - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
 }
 
+function ahorroItem(item: CartItem): number {
+  const p = item.producto
+  if (!p.precio_mayoreo || !p.umbral_mayoreo) return 0
+  const esMayoreo = item.cantidadCajas === 0 && item.cantidadPiezas >= p.umbral_mayoreo
+  if (!esMayoreo) return 0
+  return item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
+}
+
 function toTicketItems(items: CartItem[]): TicketItem[] {
   return items.map(item => ({
     nombre:         item.producto.nombre,
@@ -74,6 +82,7 @@ function toTicketItems(items: CartItem[]): TicketItem[] {
     unidad:         item.producto.unidad,
     subtotal:       subtotalItem(item),
     colorNombre:    item.colorNombre ?? null,
+    ahorro:         ahorroItem(item),
   }))
 }
 
@@ -114,8 +123,8 @@ function ProductoCardPOS({
           {producto.nombre}
         </p>
         {enCarrito && (
-          <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
-            {totalPzs}
+          <span className="shrink-0 min-w-[1.5rem] px-1 h-6 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
+            {formatNum(totalPzs)}
           </span>
         )}
       </div>
@@ -140,7 +149,7 @@ function ProductoCardPOS({
             semaforo === 'amarillo' ? 'bg-amber-100 text-amber-700' :
             'bg-green-100 text-green-700'
           }`}>
-            {producto.stock_fisico} {producto.unidad}
+            {formatNum(producto.stock_fisico)} {producto.unidad}
           </div>
           {tieneColores && (
             <span className="text-[10px] text-violet-500 font-medium">Elige color ▸</span>
@@ -151,49 +160,132 @@ function ProductoCardPOS({
   )
 }
 
-// ── Color picker modal ─────────────────────────────────────────
-function ColorPickerModal({
+// ── Modal de cantidad — se muestra SIEMPRE al tocar un producto.
+//    El usuario elige color (si aplica), cajas y piezas antes de agregar.
+function AgregarProductoModal({
   producto,
   colores,
   onClose,
-  onSelect,
+  onConfirm,
 }: {
-  producto: Producto
-  colores:  ProductoColor[]
-  onClose:  () => void
-  onSelect: (color: ProductoColor) => void
+  producto:  Producto
+  colores:   ProductoColor[]
+  onClose:   () => void
+  onConfirm: (cajas: number, piezas: number, color: ProductoColor | null) => void
 }) {
+  const tieneColores = colores.length > 0
+  const tieneCaja    = !!(producto.precio_caja && producto.piezas_por_caja)
+
+  const [colorSel, setColorSel] = useState<ProductoColor | null>(null)
+  const [cajas,    setCajas]    = useState(0)
+  const [piezas,   setPiezas]   = useState(tieneColores ? 0 : 1)
+
+  const stockDisp      = colorSel ? colorSel.stock : tieneColores ? 0 : producto.stock_fisico
+  const maxCajasN      = tieneCaja && stockDisp > 0 ? Math.floor(stockDisp / producto.piezas_por_caja!) : 0
+  const maxPiezasN     = Math.max(0, stockDisp - cajas * (producto.piezas_por_caja ?? 0))
+  const colorPendiente = tieneColores && !colorSel
+  const puedeAceptar   = !colorPendiente && (cajas > 0 || piezas > 0)
+  // Cuando el producto tiene cajas Y su unidad es 'caja', las piezas sueltas usan 'pza'
+  const piezasLabel    = tieneCaja && producto.unidad === 'caja' ? 'pza' : producto.unidad
+
+  function handleSelectColor(c: ProductoColor) {
+    if (c.stock <= 0) return
+    setColorSel(c)
+    setCajas(0)
+    setPiezas(1)
+  }
+
+  function handleSetCajas(v: number) {
+    setCajas(v)
+    const newMax = Math.max(0, stockDisp - v * (producto.piezas_por_caja ?? 0))
+    if (piezas > newMax) setPiezas(newMax)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl">
+        {/* Header */}
         <div className="flex items-center justify-between p-5 pb-4 border-b border-slate-100">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Selecciona el color</h2>
-            <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{producto.nombre}</p>
+            <h2 className="text-base font-semibold text-slate-900">Agregar al carrito</h2>
+            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{producto.nombre}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-5 grid grid-cols-2 gap-2">
-          {colores.map(c => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c)}
-              disabled={c.stock <= 0}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                c.stock <= 0
-                  ? 'border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed'
-                  : 'border-slate-200 hover:border-violet-400 hover:bg-violet-50 active:scale-[0.97]'
-              }`}
-            >
-              <span className="w-6 h-6 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-              <div>
-                <p className="text-sm font-semibold text-slate-800">{c.nombre}</p>
-                <p className="text-xs text-slate-400">{c.stock} en stock</p>
+
+        <div className="p-5 space-y-5">
+          {/* Color selector */}
+          {tieneColores && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2.5">
+                Color
+                {colorSel
+                  ? <span className="text-violet-600 normal-case font-medium ml-1">· {colorSel.nombre}</span>
+                  : <span className="text-red-500 normal-case font-medium ml-1">· elige uno</span>
+                }
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {colores.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSelectColor(c)}
+                    disabled={c.stock <= 0}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                      colorSel?.id === c.id
+                        ? 'border-violet-500 bg-violet-50'
+                        : c.stock <= 0
+                          ? 'border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed'
+                          : 'border-slate-200 hover:border-violet-300 active:scale-[0.97]'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{c.nombre}</p>
+                      <p className="text-xs text-slate-400">{formatNum(c.stock)} disp.</p>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </button>
-          ))}
+            </div>
+          )}
+
+          {/* Steppers de cantidad — visibles solo cuando el color ya está resuelto */}
+          {!colorPendiente && (
+            <div className="space-y-3">
+              {tieneCaja && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Cajas</span>
+                  <Stepper value={cajas} max={maxCajasN} onChange={handleSetCajas} color="amber" label="caja" />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">{tieneCaja ? 'Piezas' : 'Cantidad'}</span>
+                <Stepper value={piezas} max={maxPiezasN} onChange={setPiezas} color="slate" label={piezasLabel} />
+              </div>
+              <p className="text-xs text-slate-400 text-right">
+                {formatNum(stockDisp)} {producto.unidad} disponibles
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-5 pb-5">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirm(cajas, piezas, colorSel)}
+            disabled={!puedeAceptar}
+            className="flex-1 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold transition-colors"
+          >
+            Agregar
+          </button>
         </div>
       </div>
     </div>
@@ -313,7 +405,7 @@ function CartItemRow({
               max={maxPiezas(item)}
               onChange={v => onSetPiezas(key, v)}
               color="slate"
-              label={p.unidad}
+              label={p.unidad === 'caja' ? 'pza' : p.unidad}
             />
             {item.cantidadPiezas > 0 && (
               <span className="text-xs text-slate-500">
@@ -419,7 +511,7 @@ export default function VentaClient() {
   const [loading,        setLoading]        = useState(true)
   const [search,         setSearch]         = useState('')
   const [carrito,        setCarrito]        = useState<CartItem[]>([])
-  const [colorPickerProd,setColorPickerProd]= useState<Producto | null>(null)
+  const [agregarModalProd,setAgregarModalProd] = useState<Producto | null>(null)
   const [showCarrito,    setShowCarrito]    = useState(false)
   const [showPayment,    setShowPayment]    = useState(false)
   const [confirmando,    setConfirmando]    = useState(false)
@@ -492,40 +584,44 @@ export default function VentaClient() {
     )
   }
 
+  // Abre el modal de cantidad — el carrito no se toca hasta que el
+  // usuario confirme explícitamente cuántas cajas/piezas y qué color.
   function agregarAlCarrito(producto: Producto) {
     if (producto.stock_fisico <= 0) return
-    const colores = coloresMap.get(producto.id) ?? []
-    if (colores.length > 0) {
-      // Producto con variantes: mostrar selector de color
-      setColorPickerProd(producto)
-      return
-    }
-    setCarrito(prev => {
-      const idx = prev.findIndex(i => i.producto.id === producto.id && !i.colorNombre)
-      if (idx >= 0) {
-        const item = prev[idx]
-        if (item.cantidadPiezas >= maxPiezas(item)) return prev
-        const updated = [...prev]
-        updated[idx] = { ...item, cantidadPiezas: item.cantidadPiezas + 1 }
-        return updated
-      }
-      return [...prev, { producto, cantidadCajas: 0, cantidadPiezas: 1 }]
-    })
+    setAgregarModalProd(producto)
   }
 
-  function agregarAlCarritoConColor(producto: Producto, color: ProductoColor) {
-    setColorPickerProd(null)
-    if (color.stock <= 0) return
+  function confirmarAgregarAlCarrito(cajas: number, piezas: number, color: ProductoColor | null) {
+    const producto    = agregarModalProd!
+    const colorNombre = color?.nombre ?? null
+    const colorStock  = color?.stock
+    setAgregarModalProd(null)
+    if (cajas === 0 && piezas === 0) return
+
     setCarrito(prev => {
-      const idx = prev.findIndex(i => i.producto.id === producto.id && i.colorNombre === color.nombre)
+      const key = `${producto.id}-${colorNombre ?? ''}`
+      const idx = prev.findIndex(i => cartKey(i) === key)
+
       if (idx >= 0) {
-        const item = prev[idx]
-        if (item.cantidadPiezas >= maxPiezas(item)) return prev
-        const updated = [...prev]
-        updated[idx] = { ...item, cantidadPiezas: item.cantidadPiezas + 1 }
+        // Ya en carrito: sumar cantidades sin exceder stock
+        const existing  = prev[idx]
+        const stockLim  = colorStock ?? producto.stock_fisico
+        const newCajas  = Math.min(existing.cantidadCajas + cajas, maxCajas(producto))
+        const cajasPzs  = newCajas * (producto.piezas_por_caja ?? 0)
+        const newPiezas = Math.min(existing.cantidadPiezas + piezas, Math.max(0, stockLim - cajasPzs))
+        const updated   = [...prev]
+        updated[idx]    = { ...existing, cantidadCajas: newCajas, cantidadPiezas: newPiezas }
         return updated
       }
-      return [...prev, { producto, cantidadCajas: 0, cantidadPiezas: 1, colorNombre: color.nombre, colorStock: color.stock }]
+
+      // Nuevo ítem
+      return [...prev, {
+        producto,
+        cantidadCajas:  cajas,
+        cantidadPiezas: piezas,
+        colorNombre,
+        ...(colorStock !== undefined ? { colorStock } : {}),
+      }]
     })
   }
 
@@ -854,13 +950,13 @@ export default function VentaClient() {
       )}
     </div>
 
-    {/* ── Color picker modal ──────────────────────────────── */}
-    {colorPickerProd && (
-      <ColorPickerModal
-        producto={colorPickerProd}
-        colores={coloresMap.get(colorPickerProd.id) ?? []}
-        onClose={() => setColorPickerProd(null)}
-        onSelect={color => agregarAlCarritoConColor(colorPickerProd, color)}
+    {/* ── Modal de cantidad al agregar ────────────────────── */}
+    {agregarModalProd && (
+      <AgregarProductoModal
+        producto={agregarModalProd}
+        colores={coloresMap.get(agregarModalProd.id) ?? []}
+        onClose={() => setAgregarModalProd(null)}
+        onConfirm={confirmarAgregarAlCarrito}
       />
     )}
 

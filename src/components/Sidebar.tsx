@@ -19,8 +19,8 @@ const MODULES = [
   { id: 'proveedores', label: 'Proveedores',   href: '/proveedores', icon: Building2,    built: true,  adminOnly: true  },
   { id: 'costos',      label: 'Costos',        href: '/costos',      icon: Receipt,      built: true,  adminOnly: true  },
   { id: 'dashboard',   label: 'Dashboard',     href: '/dashboard',   icon: BarChart3,    built: true,  adminOnly: true  },
-  { id: 'pedidos',     label: 'Pedidos',       href: '/pedidos',     icon: ClipboardList,built: false, adminOnly: false },
-  { id: 'clientes',    label: 'Clientes',      href: '/clientes',    icon: Users,        built: false, adminOnly: false },
+  { id: 'pedidos',     label: 'Pedidos',       href: '/pedidos',     icon: ClipboardList,built: false, adminOnly: true  },
+  { id: 'clientes',    label: 'Clientes',      href: '/clientes',    icon: Users,        built: false, adminOnly: true  },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {
