@@ -25,25 +25,34 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
-// ── Print CSS — @page con altura `auto` para que el largo del
-// ticket se ajuste al contenido (no a un tamaño fijo del driver).
-// El ancho fijo (58mm efectivo) evita mismatch; `auto` en la altura
-// hace que el papel se corte justo al final del contenido.
-const PRINT_CSS = `
-  @page {
-    size: 58mm auto;
-    margin: 0;
+// ── Print CSS — imprime la VENTANA PRINCIPAL (sin popup ni iframe,
+// que se interrumpían en la térmica). En @media print ocultamos todo
+// menos #ticket-print y lo posicionamos arriba-izquierda. `@page auto`
+// ajusta el largo del papel al contenido.
+const PRINT_STYLE = `
+@media print {
+  @page { size: 58mm auto; margin: 0; }
+  html, body {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: auto; }
-  body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 15px;
-    line-height: 1.4;
-    width: 58mm;
-    padding: 1.5mm 2mm;        /* simétrico — sin margen marcado */
-    color: #000;
+  body * { visibility: hidden !important; }
+  #ticket-print, #ticket-print * { visibility: visible !important; }
+  #ticket-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 58mm !important;
+    margin: 0 !important;
+    padding: 1.5mm 2mm !important;        /* simétrico — sin margen marcado */
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
   }
+}
 `
 
 // ── Ticket rows — inline styles so they render identically
@@ -77,21 +86,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — ventana popup (método probado que imprime completo).
-  //    El iframe oculto abortaba el trabajo en la térmica. Para quitar
-  //    el "about:blank" / fecha / "1/2" del impreso: en el diálogo de
-  //    Chrome desactivar "Encabezados y pies de página" (se recuerda).
+  // ── Print — imprime la ventana actual. El CSS @media print (abajo)
+  //    oculta todo menos el ticket. Sin popup/iframe = no se interrumpe.
   function handlePrint(): void {
-    const content = ticketRef.current?.innerHTML ?? ''
-    const win = window.open('', '_blank', 'width=400,height=700')
-    if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title><style>${PRINT_CSS}</style></head><body>${content}</body></html>`)
-    win.document.close()
-    win.focus()
-    setTimeout(() => {
-      win.print()
-      win.close()
-    }, 600)
+    window.print()
   }
 
   // ── Email via Resend API ─────────────────────────────────────
@@ -161,6 +159,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+      <style dangerouslySetInnerHTML={{ __html: PRINT_STYLE }} />
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
@@ -174,6 +173,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         {/* ── Ticket preview (innerHTML is captured for print) ── */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
+            id="ticket-print"
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
