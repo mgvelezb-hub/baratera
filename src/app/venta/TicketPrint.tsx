@@ -26,11 +26,10 @@ interface Props {
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
 // ── Print CSS para el documento del popup.
-// CLAVE: NO usar `size: 58mm auto` — es CSS inválido (medida + auto)
-// que hacía que Chrome paginara el ticket alto y la térmica solo
-// imprimiera la 1ª página (se cortaba tras el logo). Sin `size`, el
-// ticket es UNA sola página continua y se imprime completo. El ancho
-// lo da el driver / "Tamaño de papel" del diálogo de impresión.
+// El @page se inyecta dinámicamente en handlePrint con el ALTO EXACTO
+// del contenido medido (ver abajo), para que el ticket sea UNA sola
+// página de su tamaño justo → nunca se pagina (causa del corte en
+// tickets largos) ni alimenta papel en blanco. Aquí solo un fallback.
 const PRINT_CSS = `
   @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -76,21 +75,30 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — popup con SOLO el ticket. El popup se imprime a sí mismo
-  //    al cargar y se cierra en `onafterprint` (NO con temporizador, que
-  //    cerraba la ventana a media impresión y cortaba el ticket en la
-  //    térmica). Fallback de 30s por si onafterprint no dispara.
+  // ── Print — popup con SOLO el ticket. Al cargar MIDE el alto real del
+  //    contenido y crea un @page de exactamente ese alto, así el ticket
+  //    es UNA sola página (nunca se pagina → no se corta en tickets
+  //    largos) y no alimenta papel en blanco. Se cierra en onafterprint
+  //    (no con temporizador, que abortaba el spool). Fallback 30s.
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
     const win = window.open('', '_blank', 'width=400,height=700')
     if (!win) return
+    const script =
+      `window.onafterprint=function(){window.close()};` +
+      `window.onload=function(){` +
+      `var px=document.body.scrollHeight;` +              // alto real en px (96dpi)
+      `var mm=Math.ceil(px*25.4/96)+6;` +                 // px→mm + colchón
+      `var s=document.createElement('style');` +
+      `s.appendChild(document.createTextNode('@page{size:58mm '+mm+'mm;margin:0}'));` +
+      `document.head.appendChild(s);` +
+      `window.focus();window.print();` +
+      `setTimeout(function(){window.close()},30000);` +
+      `};`
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
       `<style>${PRINT_CSS}</style></head><body>${content}` +
-      `<script>window.onafterprint=function(){window.close()};` +
-      `window.onload=function(){window.focus();window.print();` +
-      `setTimeout(function(){window.close()},30000)};<\/script>` +
-      `</body></html>`
+      `<script>${script}<\/script></body></html>`
     )
     win.document.close()
   }
