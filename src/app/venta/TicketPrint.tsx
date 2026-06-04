@@ -38,16 +38,11 @@ const PRINT_CSS = `
   html, body { height: auto; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 16px;
-    width: 54mm;
-    padding: 2mm 2mm 2mm 0mm;  /* sin margen izquierdo */
+    font-size: 15px;
+    line-height: 1.4;
+    width: 58mm;
+    padding: 1.5mm 2mm;        /* simétrico — sin margen marcado */
     color: #000;
-  }
-  .titulo {
-    font-size: 20px;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 4px;
   }
 `
 
@@ -82,22 +77,37 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — ventana popup, misma lógica que imprimía completo
-  function handlePrint() {
+  // ── Print — iframe oculto (NO popup). Evita que Chrome inserte
+  //    encabezado/pie (about:blank, fecha, "1/2") y la partición en
+  //    2 páginas. El <title> vacío deja el encabezado en blanco.
+  function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
-    const win = window.open('', '_blank', 'width=400,height=700')
-    if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<title>Ticket</title>
-<style>${PRINT_CSS}</style>
-</head><body>${content}</body></html>`)
-    win.document.close()
-    win.focus()
+    const iframe  = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
+    document.body.appendChild(iframe)
+
+    const win = iframe.contentWindow
+    const doc = win?.document
+    if (!win || !doc) {
+      if (iframe.parentNode) document.body.removeChild(iframe)
+      return
+    }
+
+    doc.open()
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title></title><style>${PRINT_CSS}</style></head><body>${content}</body></html>`)
+    doc.close()
+
+    function cleanup(): void {
+      setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe) }, 500)
+    }
+
+    win.onafterprint = cleanup
     setTimeout(() => {
+      win.focus()
       win.print()
-      win.close()
-    }, 500)
+      cleanup()
+    }, 300)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
@@ -181,29 +191,31 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
-            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '13px', lineHeight: '1.5', color: '#000', paddingLeft: '0px', marginLeft: '-8px'  }}
+            style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* Store name */}
-            <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px', marginBottom: '2px' }}>
-              Papelería La Más Baratera
-            </p>
-            <p style={{ textAlign: 'center', fontSize: '10px', color: '#000', marginBottom: '4px' }}>
-              {hora}
-            </p>
+            {/* ── Logo tipográfico ── */}
+            <div style={{ textAlign: 'center', borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '5px 0', marginBottom: '5px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '5px', margin: 0 }}>PAPELERÍA</p>
+              <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
+              <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
+            </div>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>lamasbaratera.com.mx</p>
+            <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
+
             <Divider />
 
-            {/* Items */}
+            {/* ── Items — ancho completo, precio al borde derecho ── */}
             {items.map((item, i) => {
               const parts: string[] = []
               if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
               if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
               const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')
               return (
-                <div key={i} style={{ marginBottom: '4px' }}>
+                <div key={i} style={{ marginBottom: '5px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
-                    <span style={{ fontSize: '13px', color: '#000' }}>{descripcion}</span>
-                    <span>{formatMXN(item.subtotal)}</span>
+                    <span style={{ fontSize: '13px', paddingLeft: '6px' }}>{descripcion}</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>
               )
@@ -211,41 +223,47 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
             <Divider />
 
-            {/* Total */}
-            <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
+            {/* ── Total ── */}
+            <Row style={{ fontSize: '20px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
-              <span>{formatMXN(total)}</span>
+              <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
             </Row>
 
             <Divider />
 
-            {/* Payment breakdown */}
-            <Row style={{ fontSize: '13px', color: '#000' }}>
+            {/* ── Desglose de pago ── */}
+            <Row style={{ fontSize: '13px' }}>
               <span>Forma de pago</span>
-              <span>{metodoLabel}</span>
+              <span style={{ whiteSpace: 'nowrap' }}>{metodoLabel}</span>
             </Row>
             {payment.montoEfectivo > 0 && (
-              <Row style={{ fontSize: '13px', color: '#000' }}>
+              <Row style={{ fontSize: '13px' }}>
                 <span>Efectivo</span>
-                <span>{formatMXN(payment.montoEfectivo)}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoEfectivo)}</span>
               </Row>
             )}
             {payment.montoTarjeta > 0 && (
-              <Row style={{ fontSize: '13px', color: '#000' }}>
+              <Row style={{ fontSize: '13px' }}>
                 <span>Tarjeta</span>
-                <span>{formatMXN(payment.montoTarjeta)}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTarjeta)}</span>
+              </Row>
+            )}
+            {payment.montoTransferencia > 0 && (
+              <Row style={{ fontSize: '13px' }}>
+                <span>Transferencia</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTransferencia)}</span>
               </Row>
             )}
             {payment.cambio > 0 && (
               <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
                 <span>Cambio</span>
-                <span>{formatMXN(payment.cambio)}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.cambio)}</span>
               </Row>
             )}
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '16px', color: '#000' }}>¡Gracias por su compra!</p>
-            <p style={{ textAlign: 'center', fontSize: '16px', color: '#000' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '14px', fontWeight: 'bold' }}>¡Gracias por su compra!</p>
+            <p style={{ textAlign: 'center', fontSize: '13px' }}>Vuelva pronto</p>
           </div>
         </div>
 
