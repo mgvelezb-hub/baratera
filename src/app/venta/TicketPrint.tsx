@@ -25,10 +25,14 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
-// ── Print CSS para el documento del popup. `@page auto` ajusta el
-// largo del papel al contenido; ancho 58mm; padding simétrico.
+// ── Print CSS para el documento del popup.
+// CLAVE: NO usar `size: 58mm auto` — es CSS inválido (medida + auto)
+// que hacía que Chrome paginara el ticket alto y la térmica solo
+// imprimiera la 1ª página (se cortaba tras el logo). Sin `size`, el
+// ticket es UNA sola página continua y se imprime completo. El ancho
+// lo da el driver / "Tamaño de papel" del diálogo de impresión.
 const PRINT_CSS = `
-  @page { size: 58mm auto; margin: 0; }
+  @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: auto; }
   body {
