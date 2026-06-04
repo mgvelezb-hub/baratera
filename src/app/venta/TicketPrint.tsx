@@ -25,34 +25,20 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
-// ── Print CSS — imprime la VENTANA PRINCIPAL (sin popup ni iframe,
-// que se interrumpían en la térmica). En @media print ocultamos todo
-// menos #ticket-print y lo posicionamos arriba-izquierda. `@page auto`
-// ajusta el largo del papel al contenido.
-const PRINT_STYLE = `
-@media print {
+// ── Print CSS para el documento del popup. `@page auto` ajusta el
+// largo del papel al contenido; ancho 58mm; padding simétrico.
+const PRINT_CSS = `
   @page { size: 58mm auto; margin: 0; }
-  html, body {
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #fff !important;
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: auto; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 15px;
+    line-height: 1.4;
+    width: 58mm;
+    padding: 1.5mm 2mm;        /* simétrico — sin margen marcado */
+    color: #000;
   }
-  body * { visibility: hidden !important; }
-  #ticket-print, #ticket-print * { visibility: visible !important; }
-  #ticket-print {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 58mm !important;
-    margin: 0 !important;
-    padding: 1.5mm 2mm !important;        /* simétrico — sin margen marcado */
-    font-family: 'Courier New', Courier, monospace !important;
-    font-size: 15px !important;
-    line-height: 1.4 !important;
-    color: #000 !important;
-  }
-}
 `
 
 // ── Ticket rows — inline styles so they render identically
@@ -86,10 +72,23 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — imprime la ventana actual. El CSS @media print (abajo)
-  //    oculta todo menos el ticket. Sin popup/iframe = no se interrumpe.
+  // ── Print — popup con SOLO el ticket. El popup se imprime a sí mismo
+  //    al cargar y se cierra en `onafterprint` (NO con temporizador, que
+  //    cerraba la ventana a media impresión y cortaba el ticket en la
+  //    térmica). Fallback de 30s por si onafterprint no dispara.
   function handlePrint(): void {
-    window.print()
+    const content = ticketRef.current?.innerHTML ?? ''
+    const win = window.open('', '_blank', 'width=400,height=700')
+    if (!win) return
+    win.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
+      `<style>${PRINT_CSS}</style></head><body>${content}` +
+      `<script>window.onafterprint=function(){window.close()};` +
+      `window.onload=function(){window.focus();window.print();` +
+      `setTimeout(function(){window.close()},30000)};<\/script>` +
+      `</body></html>`
+    )
+    win.document.close()
   }
 
   // ── Email via Resend API ─────────────────────────────────────
@@ -159,7 +158,6 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <style dangerouslySetInnerHTML={{ __html: PRINT_STYLE }} />
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
@@ -173,7 +171,6 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         {/* ── Ticket preview (innerHTML is captured for print) ── */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
-            id="ticket-print"
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
