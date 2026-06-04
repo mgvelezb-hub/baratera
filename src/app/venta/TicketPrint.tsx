@@ -26,10 +26,11 @@ interface Props {
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
 // ── Print CSS para el documento del popup.
-// El @page se inyecta dinámicamente en handlePrint con el ALTO EXACTO
-// del contenido medido (ver abajo), para que el ticket sea UNA sola
-// página de su tamaño justo → nunca se pagina (causa del corte en
-// tickets largos) ni alimenta papel en blanco. Aquí solo un fallback.
+// SIN @page con tamaño: el largo del ticket lo gobierna el DRIVER de la
+// impresora (configurar la Epson en modo "Recibo/Rollo" con corte
+// automático). Forzar el alto por CSS (medir contenido + @page exacto)
+// causaba cortes — por eso se removió. Solo @page { margin: 0 } para
+// aprovechar todo el ancho sin los márgenes que mete el navegador.
 const PRINT_CSS = `
   @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -75,32 +76,25 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — popup con SOLO el ticket. Al cargar MIDE el alto real del
-  //    contenido y crea un @page de exactamente ese alto, así el ticket
-  //    es UNA sola página (nunca se pagina → no se corta en tickets
-  //    largos) y no alimenta papel en blanco. Se cierra en onafterprint
-  //    (no con temporizador, que abortaba el spool). Fallback 30s.
+  // ── Print — popup simple (mecanismo original probado que SÍ imprime).
+  //    Escribe el ticket, enfoca, imprime y cierra. NO mide alto ni
+  //    inyecta un @page con tamaño: el largo lo gobierna el driver de la
+  //    impresora (Epson en modo Recibo/Rollo con corte automático).
+  //    Forzar el alto por CSS causaba cortes en tickets largos.
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
     const win = window.open('', '_blank', 'width=400,height=700')
     if (!win) return
-    const script =
-      `window.onafterprint=function(){window.close()};` +
-      `window.onload=function(){` +
-      `var px=document.body.scrollHeight;` +              // alto real en px (96dpi)
-      `var mm=Math.ceil(px*25.4/96)+6;` +                 // px→mm + colchón
-      `var s=document.createElement('style');` +
-      `s.appendChild(document.createTextNode('@page{size:58mm '+mm+'mm;margin:0}'));` +
-      `document.head.appendChild(s);` +
-      `window.focus();window.print();` +
-      `setTimeout(function(){window.close()},30000);` +
-      `};`
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
-      `<style>${PRINT_CSS}</style></head><body>${content}` +
-      `<script>${script}<\/script></body></html>`
+      `<style>${PRINT_CSS}</style></head><body>${content}</body></html>`
     )
     win.document.close()
+    win.focus()
+    setTimeout(() => {
+      win.print()
+      win.close()
+    }, 500)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
