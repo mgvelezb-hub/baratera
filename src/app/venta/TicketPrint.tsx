@@ -25,10 +25,17 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
-// ── Print CSS — sin @page para que el driver use su tamaño
-// configurado y no haya mismatch ni errores de impresión.
+// ── Print CSS — @page con altura `auto` para que el largo del
+// ticket se ajuste al contenido (no a un tamaño fijo del driver).
+// El ancho fijo (58mm efectivo) evita mismatch; `auto` en la altura
+// hace que el papel se corte justo al final del contenido.
 const PRINT_CSS = `
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: auto; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 16px;
