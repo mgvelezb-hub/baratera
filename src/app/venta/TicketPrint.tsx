@@ -77,45 +77,21 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — iframe oculto (NO popup). Evita que Chrome inserte
-  //    encabezado/pie (about:blank, fecha, "1/2") y la partición en
-  //    2 páginas. El <title> vacío deja el encabezado en blanco.
+  // ── Print — ventana popup (método probado que imprime completo).
+  //    El iframe oculto abortaba el trabajo en la térmica. Para quitar
+  //    el "about:blank" / fecha / "1/2" del impreso: en el diálogo de
+  //    Chrome desactivar "Encabezados y pies de página" (se recuerda).
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
-    const iframe  = document.createElement('iframe')
-    iframe.setAttribute('aria-hidden', 'true')
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
-    document.body.appendChild(iframe)
-
-    const win = iframe.contentWindow
-    const doc = win?.document
-    if (!win || !doc) {
-      if (iframe.parentNode) document.body.removeChild(iframe)
-      return
-    }
-
-    let cleaned = false
-    function cleanup(): void {
-      if (cleaned) return
-      cleaned = true
-      if (iframe.parentNode) document.body.removeChild(iframe)
-    }
-
-    // Limpiar SOLO cuando el trabajo terminó. Remover el iframe antes
-    // (mientras la térmica aún alimenta papel) aborta la impresión.
-    win.onafterprint = cleanup
-
-    doc.open()
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title></title><style>${PRINT_CSS}</style></head><body>${content}</body></html>`)
-    doc.close()
-
+    const win = window.open('', '_blank', 'width=400,height=700')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title><style>${PRINT_CSS}</style></head><body>${content}</body></html>`)
+    win.document.close()
+    win.focus()
     setTimeout(() => {
-      win.focus()
       win.print()
-      // Fallback por si onafterprint no dispara: el iframe es invisible,
-      // dejarlo 60s no molesta y garantiza que no se corte el trabajo.
-      setTimeout(cleanup, 60000)
-    }, 400)
+      win.close()
+    }, 600)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
