@@ -63,17 +63,32 @@ export interface Proveedor {
   created_at:      string
 }
 
+export interface PagoProveedor {
+  id:                  string
+  adeudo_id:           string
+  monto:               number
+  metodo:              'efectivo' | 'tarjeta' | 'transferencia' | 'mixto'
+  monto_efectivo:      number
+  monto_tarjeta:       number
+  monto_transferencia: number
+  notas:               string | null
+  created_by:          string | null
+  created_at:          string
+}
+
 export interface Adeudo {
   id:                string
   proveedor_id:      string
   descripcion:       string
   monto:             number
-  fecha_vencimiento: string   // 'YYYY-MM-DD'
-  estado:            'pendiente' | 'pagado'
+  monto_pagado:      number          // suma de pagos_proveedor
+  fecha_vencimiento: string          // 'YYYY-MM-DD'
+  estado:            'pendiente' | 'parcial' | 'pagado'
   fecha_pago:        string | null
   notas:             string | null
   created_at:        string
   proveedores?:      { nombre: string }
+  pagos_proveedor?:  PagoProveedor[]
 }
 
 // ── Costos fijos ──────────────────────────────────────────────

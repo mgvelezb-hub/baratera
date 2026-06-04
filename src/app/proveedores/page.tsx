@@ -11,7 +11,7 @@ export default async function ProveedoresPage() {
     supabase.from('proveedores').select('*').eq('activo', true).order('nombre'),
     supabase
       .from('adeudos')
-      .select('*, proveedores(nombre)')
+      .select('*, proveedores(nombre), pagos_proveedor(*)')
       .order('fecha_vencimiento', { ascending: true }),
   ])
 

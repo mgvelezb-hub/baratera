@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const { data: adeudos, error } = await supabase
     .from('adeudos')
     .select('*, proveedores(nombre)')
-    .eq('estado', 'pendiente')
+    .in('estado', ['pendiente', 'parcial'])
     .lte('fecha_vencimiento', cutoff)
     .order('fecha_vencimiento')
 
@@ -46,25 +46,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, enviado: false, motivo: 'sin adeudos próximos' })
   }
 
-  const totalMonto = adeudos.reduce((sum, a) => sum + Number(a.monto), 0)
+  const totalMonto = adeudos.reduce((sum, a) => sum + Number(a.monto) - Number(a.monto_pagado ?? 0), 0)
 
   const rows = adeudos.map(a => {
     const dias = Math.round(
       (new Date(a.fecha_vencimiento).getTime() - new Date(today).getTime()) / 86400000
     )
-    const color = colorSemaforo(dias)
-    const label = diasLabel(dias)
+    const color    = colorSemaforo(dias)
+    const label    = diasLabel(dias)
+    const restante = Number(a.monto) - Number(a.monto_pagado ?? 0)
+    const parcial  = a.estado === 'parcial'
     return `
       <tr>
         <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
           <div style="font-weight:600;color:#1e293b;">${a.proveedores?.nombre ?? '—'}</div>
           <div style="font-size:13px;color:#64748b;">${a.descripcion}</div>
-          <div style="margin-top:4px;">
+          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
             <span style="background:${color}1a;color:${color};padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;">${label}</span>
+            ${parcial ? `<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;">Pago parcial</span>` : ''}
           </div>
         </td>
         <td style="padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#1e293b;white-space:nowrap;">
-          ${formatMXN(Number(a.monto))}
+          ${formatMXN(restante)}
+          ${parcial ? `<div style="font-size:11px;color:#94a3b8;font-weight:400;">de ${formatMXN(Number(a.monto))}</div>` : ''}
         </td>
       </tr>`
   }).join('')
