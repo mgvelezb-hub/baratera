@@ -64,7 +64,6 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     if (!form.nombre.trim()) { setError('El nombre es requerido'); return }
     if (!form.precio_menudeo || parseFloat(form.precio_menudeo) < 0) { setError('El precio menudeo debe ser mayor a 0'); return }
     if (form.precio_caja && !form.piezas_por_caja) { setError('Indica cuántas piezas tiene cada caja'); return }
-    if (form.piezas_por_caja && !form.precio_caja) { setError('Indica el precio por caja'); return }
 
     setLoading(true)
     const supabase = createClient()
@@ -260,8 +259,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                   min="1"
                   value={form.piezas_por_caja}
                   onChange={e => set('piezas_por_caja', e.target.value)}
-                  disabled={!form.precio_caja}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   placeholder="Ej: 12"
                 />
               </div>

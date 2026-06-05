@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatNum } from '@/lib/utils'
+import { formatNum, formatStockConCajas } from '@/lib/utils'
 
 // Paleta de colores presets
 const COLOR_PALETTE = [
@@ -39,11 +39,13 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   const [dangerLoading,   setDangerLoading]   = useState(false)
 
   // Colores
-  const [colores,         setColores]         = useState<ProductoColor[]>([])
-  const [nuevoColorHex,   setNuevoColorHex]   = useState(COLOR_PALETTE[0].hex)
-  const [nuevoColorNombre,setNuevoColorNombre]= useState('')
-  const [colorLoading,    setColorLoading]    = useState(false)
-  const [colorError,      setColorError]      = useState('')
+  const [colores,          setColores]         = useState<ProductoColor[]>([])
+  const [colorStocks,      setColorStocks]     = useState<Record<string, number>>({})
+  const [colorMins,        setColorMins]       = useState<Record<string, string>>({})
+  const [nuevoColorHex,    setNuevoColorHex]   = useState(COLOR_PALETTE[0].hex)
+  const [nuevoColorNombre, setNuevoColorNombre]= useState('')
+  const [colorLoading,     setColorLoading]    = useState(false)
+  const [colorError,       setColorError]      = useState('')
 
   useEffect(() => {
     createClient()
@@ -53,6 +55,17 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       .order('nombre')
       .then(({ data }) => setColores(data ?? []))
   }, [producto.id])
+
+  useEffect(() => {
+    const stocks: Record<string, number> = {}
+    const mins:   Record<string, string> = {}
+    for (const c of colores) {
+      stocks[c.id] = c.stock
+      mins[c.id]   = c.stock_minimo !== null && c.stock_minimo !== undefined ? String(c.stock_minimo) : ''
+    }
+    setColorStocks(stocks)
+    setColorMins(mins)
+  }, [colores])
 
   async function agregarColor() {
     if (!nuevoColorNombre.trim()) { setColorError('Escribe el nombre del color'); return }
@@ -68,6 +81,8 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       .single()
     if (err) { setColorError('Error al agregar color'); setColorLoading(false); return }
     setColores(prev => [...prev, data])
+    setColorStocks(prev => ({ ...prev, [data.id]: 0 }))
+    setColorMins(prev => ({ ...prev, [data.id]: '' }))
     setNuevoColorNombre('')
     setColorLoading(false)
   }
@@ -106,12 +121,13 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     if (form.precio_caja && !form.piezas_por_caja) {
       setError('Indica cuántas piezas tiene cada caja'); return
     }
-    if (form.piezas_por_caja && !form.precio_caja) {
-      setError('Indica el precio por caja'); return
-    }
 
     setLoading(true)
-    const { error: updateError } = await createClient()
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const ppc = parseInt(form.piezas_por_caja) || 0
+
+    const { error: updateError } = await supabase
       .from('productos')
       .update({
         nombre:          form.nombre.trim(),
@@ -132,6 +148,45 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       setError('Error al guardar. Verifica que el SKU no esté repetido.')
       setLoading(false)
       return
+    }
+
+    // ── Cambios de stock por color (crea entradas en ledger) ──
+    const coloresConCambio = colores.filter(c => (colorStocks[c.id] ?? c.stock) !== c.stock)
+    if (coloresConCambio.length > 0) {
+      let stockActual = producto.stock_fisico
+      for (const c of coloresConCambio) {
+        const nuevoStock  = colorStocks[c.id] ?? c.stock
+        const delta       = nuevoStock - c.stock
+        const tipo        = delta > 0 ? 'ajuste_positivo' : 'ajuste_negativo'
+        const stockDespues = stockActual + delta
+
+        await supabase.from('stock_ledger').insert({
+          producto_id:    producto.id,
+          tipo,
+          qty_antes:      stockActual,
+          qty_despues:    stockDespues,
+          notas:          `Ajuste manual color ${c.nombre}`,
+          canal:          'manual',
+          usuario_id:     user?.id ?? null,
+          color_variante: c.nombre,
+        })
+        await supabase.from('producto_colores').update({ stock: nuevoStock }).eq('id', c.id)
+        stockActual = stockDespues
+      }
+      // stock_fisico = suma de todos los colores
+      const nuevoStockFisico = colores.reduce(
+        (acc, c) => acc + (colorStocks[c.id] ?? c.stock), 0
+      )
+      await supabase.from('productos').update({ stock_fisico: nuevoStockFisico }).eq('id', producto.id)
+    }
+
+    // ── Cambios de stock_minimo por color ─────────────────────
+    for (const c of colores) {
+      const newMin  = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) || 0 : null
+      const oldMin  = c.stock_minimo !== undefined && c.stock_minimo !== null ? c.stock_minimo : null
+      if (newMin !== oldMin) {
+        await supabase.from('producto_colores').update({ stock_minimo: newMin }).eq('id', c.id)
+      }
     }
 
     onSuccess()
@@ -297,13 +352,12 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                   min="1"
                   value={form.piezas_por_caja}
                   onChange={e => set('piezas_por_caja', e.target.value)}
-                  disabled={!form.precio_caja}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   placeholder="Ej: 12"
                 />
               </div>
             </div>
-            {form.precio_caja && form.piezas_por_caja && (
+            {form.precio_caja && form.piezas_por_caja && parseInt(form.piezas_por_caja) > 0 && (
               <p className="text-xs text-violet-600">
                 Precio por pieza (caja): {
                   (parseFloat(form.precio_caja) / parseInt(form.piezas_por_caja)).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
@@ -336,34 +390,61 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
             {/* Colores existentes */}
             {colores.length > 0 && (
               <div className="space-y-2">
-                {colores.map(c => (
-                  <div key={c.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                        <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                {colores.map(c => {
+                  const stockActual  = colorStocks[c.id] ?? c.stock
+                  const delta        = stockActual - c.stock
+                  const ppc          = parseInt(form.piezas_por_caja) || null
+                  return (
+                    <div key={c.id} className={`rounded-xl border p-3 transition-colors ${
+                      delta !== 0 ? 'border-violet-200 bg-violet-50' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                          <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                          {delta !== 0 && (
+                            <span className={`text-xs font-semibold ${delta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {delta > 0 ? '+' : ''}{delta}
+                            </span>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => eliminarColor(c)}
+                          disabled={c.stock > 0}
+                          className="p-1 text-slate-300 hover:text-red-400 disabled:opacity-30 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <button type="button" onClick={() => eliminarColor(c)}
-                        className="p-1 text-slate-300 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">
+                            Stock
+                            {ppc && <span className="text-slate-300 ml-1">
+                              ({formatStockConCajas(stockActual, ppc, producto.unidad)})
+                            </span>}
+                          </label>
+                          <input
+                            type="number" min="0"
+                            value={stockActual}
+                            onChange={e => setColorStocks(prev => ({ ...prev, [c.id]: parseInt(e.target.value) || 0 }))}
+                            className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">
+                            Stock mínimo <span className="text-slate-300">(def. {producto.stock_minimo})</span>
+                          </label>
+                          <input
+                            type="number" min="0"
+                            value={colorMins[c.id] ?? ''}
+                            onChange={e => setColorMins(prev => ({ ...prev, [c.id]: e.target.value }))}
+                            placeholder={String(producto.stock_minimo)}
+                            className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
-                        <p className="text-xs text-slate-400 mb-0.5">Stock actual</p>
-                        <p className="text-sm font-bold text-slate-900">{formatNum(c.stock)}</p>
-                      </div>
-                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
-                        <p className="text-xs text-slate-400 mb-0.5">Stock mínimo</p>
-                        <p className="text-sm font-bold text-slate-900">{formatNum(producto.stock_minimo)}</p>
-                      </div>
-                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
-                        <p className="text-xs text-slate-400 mb-0.5">Unidad</p>
-                        <p className="text-sm font-bold text-slate-900">{producto.unidad}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

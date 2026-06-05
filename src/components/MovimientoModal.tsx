@@ -5,7 +5,7 @@ import { X, Loader2, Plus, Minus } from 'lucide-react'
 import type { Producto, MovimientoTipo, Proveedor, ProductoColor } from '@/lib/types'
 import { TIPOS_MOVIMIENTO } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
-import { formatNum } from '@/lib/utils'
+import { formatNum, formatStockConCajas } from '@/lib/utils'
 
 interface CantColor { cajas: number; piezas: number }
 
@@ -315,11 +315,13 @@ export default function MovimientoModal({
                           <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
                             style={{ backgroundColor: c.hex }} />
                           <span className="text-sm font-medium text-slate-800">{c.nombre}</span>
-                          <span className="text-xs text-slate-400">stock: {formatNum(c.stock)}</span>
+                          <span className="text-xs text-slate-400">
+                            stock: {formatStockConCajas(c.stock, ppc || null, producto.unidad)}
+                          </span>
                         </div>
                         {piezasColor > 0 && (
                           <span className="text-xs font-semibold text-violet-700">
-                            +{formatNum(piezasColor)} {producto.unidad}
+                            +{formatStockConCajas(piezasColor, ppc || null, producto.unidad)}
                           </span>
                         )}
                       </div>
@@ -421,18 +423,18 @@ export default function MovimientoModal({
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">
                 Stock actual: <span className="font-semibold text-slate-900">
-                  {formatNum(producto.stock_fisico)} {producto.unidad}
+                  {formatStockConCajas(producto.stock_fisico, ppc || null, producto.unidad)}
                 </span>
               </span>
               <span className="text-slate-500">
                 Quedará: <span className={`font-semibold ${nuevoStockTotal < producto.stock_minimo ? 'text-red-600' : 'text-slate-900'}`}>
-                  {formatNum(nuevoStockTotal)} {producto.unidad}
+                  {formatStockConCajas(nuevoStockTotal, ppc || null, producto.unidad)}
                 </span>
               </span>
             </div>
             {esModoMultiColor && totalPiezasMulti > 0 && (
               <p className="text-xs text-violet-700 font-semibold text-right">
-                +{formatNum(totalPiezasMulti)} {producto.unidad} en total
+                +{formatStockConCajas(totalPiezasMulti, ppc || null, producto.unidad)} en total
               </p>
             )}
           </div>
