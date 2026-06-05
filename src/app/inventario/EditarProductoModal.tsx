@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
+import { formatNum } from '@/lib/utils'
 
 // Paleta de colores presets
 const COLOR_PALETTE = [
@@ -334,18 +335,33 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
 
             {/* Colores existentes */}
             {colores.length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {colores.map(c => (
-                  <div key={c.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                      <span className="text-sm font-medium text-slate-700">{c.nombre}</span>
-                      <span className="text-xs text-slate-400">{c.stock} en stock</span>
+                  <div key={c.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                        <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                      </div>
+                      <button type="button" onClick={() => eliminarColor(c)}
+                        className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => eliminarColor(c)}
-                      className="p-1 text-slate-300 hover:text-red-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Stock actual</p>
+                        <p className="text-sm font-bold text-slate-900">{formatNum(c.stock)}</p>
+                      </div>
+                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Stock mínimo</p>
+                        <p className="text-sm font-bold text-slate-900">{formatNum(producto.stock_minimo)}</p>
+                      </div>
+                      <div className="bg-white rounded-lg px-3 py-2 border border-slate-100">
+                        <p className="text-xs text-slate-400 mb-0.5">Unidad</p>
+                        <p className="text-sm font-bold text-slate-900">{producto.unidad}</p>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

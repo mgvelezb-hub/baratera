@@ -19,7 +19,7 @@ const COLOR_PALETTE = [
   { nombre: 'Turquesa',  hex: '#06b6d4' },
 ]
 
-interface ColorDraft { nombre: string; hex: string }
+interface ColorDraft { nombre: string; hex: string; stock: number }
 
 const UNIDADES = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
 const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
@@ -67,7 +67,9 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const stockInicial = parseInt(form.stock_fisico) || 0
+    // Si hay colores, el stock del producto = suma de stocks por color
+    const stockColores  = coloresDraft.reduce((s, c) => s + c.stock, 0)
+    const stockInicial  = coloresDraft.length > 0 ? stockColores : (parseInt(form.stock_fisico) || 0)
 
     const { data: producto, error: insertError } = await supabase
       .from('productos')
@@ -94,24 +96,37 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
       return
     }
 
-    // Si hay stock inicial, registrar en ledger
-    if (stockInicial > 0) {
+    if (coloresDraft.length > 0) {
+      // Insertar cada color y registrar su stock inicial en el ledger
+      let stockAcum = 0
+      for (const c of coloresDraft) {
+        await supabase.from('producto_colores').insert({
+          producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: c.stock,
+        })
+        if (c.stock > 0) {
+          await supabase.from('stock_ledger').insert({
+            producto_id:    producto.id,
+            tipo:           'levantamiento_inventario',
+            qty_antes:      stockAcum,
+            qty_despues:    stockAcum + c.stock,
+            notas:          `Stock inicial — color ${c.nombre}`,
+            canal:          'manual',
+            usuario_id:     user?.id ?? null,
+            color_variante: c.nombre,
+          })
+          stockAcum += c.stock
+        }
+      }
+    } else if (stockInicial > 0) {
       await supabase.from('stock_ledger').insert({
         producto_id: producto.id,
-        tipo: 'levantamiento_inventario',
-        qty_antes: 0,
+        tipo:        'levantamiento_inventario',
+        qty_antes:   0,
         qty_despues: stockInicial,
-        notas: 'Stock inicial al crear producto',
-        canal: 'manual',
-        usuario_id: user?.id ?? null,
+        notas:       'Stock inicial al crear producto',
+        canal:       'manual',
+        usuario_id:  user?.id ?? null,
       })
-    }
-
-    // Insertar colores si se definieron
-    if (coloresDraft.length > 0) {
-      await supabase.from('producto_colores').insert(
-        coloresDraft.map(c => ({ producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: 0 }))
-      )
     }
 
     onSuccess()
@@ -250,13 +265,20 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Stock actual</label>
-              <input
-                type="number"
-                min="0"
-                value={form.stock_fisico}
-                onChange={e => set('stock_fisico', e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
+              {coloresDraft.length > 0 ? (
+                <div className="w-full h-11 px-3 rounded-lg border border-slate-100 bg-slate-50 text-sm flex items-center text-slate-400 gap-1">
+                  {coloresDraft.reduce((s, c) => s + c.stock, 0)}
+                  <span className="text-xs">(suma de colores)</span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  min="0"
+                  value={form.stock_fisico}
+                  onChange={e => set('stock_fisico', e.target.value)}
+                  className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Stock mínimo</label>
@@ -289,21 +311,47 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
 
             {/* Colores añadidos */}
             {coloresDraft.length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {coloresDraft.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                      <span className="text-sm font-medium text-slate-700">{c.nombre}</span>
-                      <span className="text-xs text-slate-400">stock 0 al inicio</span>
+                  <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                        <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setColoresDraft(prev => prev.filter((_, j) => j !== i))}
+                        className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setColoresDraft(prev => prev.filter((_, j) => j !== i))}
-                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">Stock inicial</label>
+                        <input
+                          type="number" min="0"
+                          value={c.stock}
+                          onChange={e => setColoresDraft(prev => prev.map((x, j) =>
+                            j === i ? { ...x, stock: parseInt(e.target.value) || 0 } : x
+                          ))}
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Stock mínimo</p>
+                        <div className="h-8 px-2 rounded-lg border border-slate-100 bg-white text-sm flex items-center text-slate-500">
+                          {form.stock_minimo || '5'}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Unidad</p>
+                        <div className="h-8 px-2 rounded-lg border border-slate-100 bg-white text-sm flex items-center text-slate-500">
+                          {form.unidad}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -338,7 +386,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                     if (coloresDraft.some(c => c.nombre.toLowerCase() === nuevoColorNombre.trim().toLowerCase())) {
                       setColorError('Ya existe ese color'); return
                     }
-                    setColoresDraft(prev => [...prev, { nombre: nuevoColorNombre.trim(), hex: nuevoColorHex }])
+                    setColoresDraft(prev => [...prev, { nombre: nuevoColorNombre.trim(), hex: nuevoColorHex, stock: 0 }])
                     setNuevoColorNombre('')
                     setColorError('')
                   }}
