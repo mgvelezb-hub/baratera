@@ -39,6 +39,17 @@ export function pluralUnidad(unidad: string, cantidad: number): string {
   return map[unidad] ?? unidad   // kg, lt y desconocidos no cambian
 }
 
+// Muestra stock como "X cajas + Y pzas" cuando el producto tiene piezas_por_caja.
+// Si piezasPorCaja es null/0, devuelve el formato normal con la unidad del producto.
+export function formatStockConCajas(stock: number, piezasPorCaja: number | null, unidad: string): string {
+  if (!piezasPorCaja) return `${formatNum(stock)} ${unidad}`
+  const cajas  = Math.floor(stock / piezasPorCaja)
+  const piezas = stock % piezasPorCaja
+  if (cajas  === 0) return `${formatNum(piezas)} pzas`
+  if (piezas === 0) return `${formatNum(cajas)} ${cajas === 1 ? 'caja' : 'cajas'}`
+  return `${formatNum(cajas)} ${cajas === 1 ? 'caja' : 'cajas'} + ${formatNum(piezas)} pzas`
+}
+
 export function formatFechaCorta(dateStr: string): string {
   return new Intl.DateTimeFormat('es-MX', {
     day: '2-digit',

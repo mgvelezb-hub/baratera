@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { MoreVertical, Plus, Pencil } from 'lucide-react'
 import type { Producto, ProductoColor } from '@/lib/types'
 import { calcularSemaforo } from '@/lib/types'
-import { formatMXN, formatNum } from '@/lib/utils'
+import { formatMXN, formatNum, formatStockConCajas } from '@/lib/utils'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
 import EditarProductoModal from '@/app/inventario/EditarProductoModal'
@@ -102,16 +102,21 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
           {/* Stock */}
           <div className="flex items-end justify-between">
             <div>
-              <p className={`text-2xl font-bold leading-none ${
+              <p className={`text-xl font-bold leading-none ${
                 semaforo === 'rojo' ? 'text-red-600' :
                 semaforo === 'amarillo' ? 'text-amber-600' :
                 'text-slate-900'
               }`}>
-                {formatNum(colorActivo ? colorActivo.stock : producto.stock_fisico)}
-                <span className="text-sm font-normal text-slate-400 ml-1">{producto.unidad}</span>
+                {colorActivo
+                  ? formatStockConCajas(colorActivo.stock, producto.piezas_por_caja, producto.unidad)
+                  : formatStockConCajas(producto.stock_fisico, producto.piezas_por_caja, producto.unidad)
+                }
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                {colorActivo ? `${colorActivo.nombre} · mín ${formatNum(producto.stock_minimo)}` : `Mínimo: ${formatNum(producto.stock_minimo)} ${producto.unidad}`}
+                {colorActivo
+                  ? `${colorActivo.nombre} · mín ${formatNum(colorActivo.stock_minimo ?? producto.stock_minimo)}`
+                  : `Mínimo: ${formatNum(producto.stock_minimo)} ${producto.unidad}`
+                }
               </p>
             </div>
             <div className="text-right">

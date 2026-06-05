@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatMXN, formatNum } from '@/lib/utils'
+import { formatMXN, formatNum, formatStockConCajas } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
 import PaymentModal, { type PaymentData } from './PaymentModal'
 import TicketPrint, { type TicketItem } from './TicketPrint'
@@ -41,8 +41,13 @@ function subtotalItem(item: CartItem): number {
   let total = 0
   const p = item.producto
 
-  if (item.cantidadCajas > 0 && p.precio_caja) {
-    total += item.cantidadCajas * Number(p.precio_caja)
+  if (item.cantidadCajas > 0) {
+    if (p.precio_caja) {
+      total += item.cantidadCajas * Number(p.precio_caja)
+    } else if (p.piezas_por_caja) {
+      // Sin precio_caja: cada caja vale piezas_por_caja × precio_menudeo
+      total += item.cantidadCajas * p.piezas_por_caja * Number(p.precio_menudeo)
+    }
   }
   if (item.cantidadPiezas > 0) {
     const esMayoreo = item.cantidadCajas === 0 &&
@@ -149,7 +154,7 @@ function ProductoCardPOS({
             semaforo === 'amarillo' ? 'bg-amber-100 text-amber-700' :
             'bg-green-100 text-green-700'
           }`}>
-            {formatNum(producto.stock_fisico)} {producto.unidad}
+            {formatStockConCajas(producto.stock_fisico, producto.piezas_por_caja, producto.unidad)}
           </div>
           {tieneColores && (
             <span className="text-[10px] text-violet-500 font-medium">Elige color ▸</span>
@@ -174,7 +179,8 @@ function AgregarProductoModal({
   onConfirm: (cajas: number, piezas: number, color: ProductoColor | null) => void
 }) {
   const tieneColores = colores.length > 0
-  const tieneCaja    = !!(producto.precio_caja && producto.piezas_por_caja)
+  // Muestra steppers de cajas siempre que haya piezas_por_caja, con o sin precio_caja
+  const tieneCaja    = !!producto.piezas_por_caja
 
   const [colorSel, setColorSel] = useState<ProductoColor | null>(null)
   const [cajas,    setCajas]    = useState(0)
@@ -265,7 +271,7 @@ function AgregarProductoModal({
                 <Stepper value={piezas} max={maxPiezasN} onChange={setPiezas} color="slate" label={piezasLabel} />
               </div>
               <p className="text-xs text-slate-400 text-right">
-                {formatNum(stockDisp)} {producto.unidad} disponibles
+                {formatStockConCajas(stockDisp, producto.piezas_por_caja, producto.unidad)} disponibles
               </p>
             </div>
           )}
@@ -357,7 +363,7 @@ function CartItemRow({
   onEliminar: (id: string) => void
 }) {
   const p         = item.producto
-  const tieneCaja = !!(p.precio_caja && p.piezas_por_caja)
+  const tieneCaja = !!p.piezas_por_caja
   const esMayoreo = !tieneCaja &&
     p.precio_mayoreo && p.umbral_mayoreo &&
     item.cantidadPiezas >= p.umbral_mayoreo

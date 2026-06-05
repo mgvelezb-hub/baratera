@@ -19,7 +19,7 @@ const COLOR_PALETTE = [
   { nombre: 'Turquesa',  hex: '#06b6d4' },
 ]
 
-interface ColorDraft { nombre: string; hex: string; stock: number }
+interface ColorDraft { nombre: string; hex: string; stock: number; stock_minimo: number }
 
 const UNIDADES = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
 const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
@@ -30,12 +30,15 @@ interface Props {
 }
 
 export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
-  const [loading,          setLoading]          = useState(false)
-  const [error,            setError]            = useState('')
-  const [coloresDraft,     setColoresDraft]     = useState<ColorDraft[]>([])
-  const [nuevoColorHex,    setNuevoColorHex]    = useState(COLOR_PALETTE[0].hex)
-  const [nuevoColorNombre, setNuevoColorNombre] = useState('')
-  const [colorError,       setColorError]       = useState('')
+  const [loading,              setLoading]              = useState(false)
+  const [error,                setError]                = useState('')
+  const [coloresDraft,         setColoresDraft]         = useState<ColorDraft[]>([])
+  const [paletaSeleccion,      setPaletaSeleccion]      = useState<Set<string>>(new Set())
+  const [generalStock,         setGeneralStock]         = useState(0)
+  const [generalStockMinimo,   setGeneralStockMinimo]   = useState('')
+  const [nuevoColorHex,        setNuevoColorHex]        = useState(COLOR_PALETTE[0].hex)
+  const [nuevoColorNombre,     setNuevoColorNombre]     = useState('')
+  const [colorError,           setColorError]           = useState('')
   const [form, setForm] = useState({
     nombre: '',
     sku: '',
@@ -101,7 +104,11 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
       let stockAcum = 0
       for (const c of coloresDraft) {
         await supabase.from('producto_colores').insert({
-          producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: c.stock,
+          producto_id:  producto.id,
+          nombre:       c.nombre,
+          hex:          c.hex,
+          stock:        c.stock,
+          stock_minimo: c.stock_minimo > 0 ? c.stock_minimo : null,
         })
         if (c.stock > 0) {
           await supabase.from('stock_ledger').insert({
@@ -309,6 +316,91 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
               <p className="text-xs text-slate-400 mt-0.5">Opcional — solo si el producto se maneja por colores</p>
             </div>
 
+            {/* Paleta multi-select */}
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">Toca para seleccionar uno o varios colores:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {COLOR_PALETTE.map(cp => {
+                  const yaExiste  = coloresDraft.some(c => c.nombre === cp.nombre)
+                  const isSel     = paletaSeleccion.has(cp.nombre)
+                  return (
+                    <button
+                      key={cp.hex}
+                      type="button"
+                      disabled={yaExiste}
+                      onClick={() => {
+                        setColorError('')
+                        setPaletaSeleccion(prev => {
+                          const n = new Set(prev)
+                          n.has(cp.nombre) ? n.delete(cp.nombre) : n.add(cp.nombre)
+                          return n
+                        })
+                      }}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-medium transition-all ${
+                        yaExiste
+                          ? 'opacity-30 cursor-not-allowed border-slate-100 text-slate-400'
+                          : isSel
+                            ? 'border-violet-500 bg-violet-50 text-violet-700'
+                            : 'border-slate-200 hover:border-violet-300 text-slate-600'
+                      }`}
+                    >
+                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: cp.hex }} />
+                      {cp.nombre}
+                      {isSel && <span className="text-violet-500 font-bold">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Panel de cantidad al seleccionar */}
+            {paletaSeleccion.size > 0 && (
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2.5">
+                <p className="text-xs font-semibold text-violet-700">
+                  {paletaSeleccion.size} color{paletaSeleccion.size !== 1 ? 'es' : ''} seleccionado{paletaSeleccion.size !== 1 ? 's' : ''}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-1">Stock inicial para todos</label>
+                    <input
+                      type="number" min="0"
+                      value={generalStock}
+                      onChange={e => setGeneralStock(parseInt(e.target.value) || 0)}
+                      className="w-full h-8 px-2 rounded-lg border border-violet-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-1">Stock mínimo para todos</label>
+                    <input
+                      type="number" min="0"
+                      value={generalStockMinimo}
+                      onChange={e => setGeneralStockMinimo(e.target.value)}
+                      placeholder={form.stock_minimo || '5'}
+                      className="w-full h-8 px-2 rounded-lg border border-violet-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const stockMin = parseInt(generalStockMinimo) || parseInt(form.stock_minimo) || 5
+                    const toAdd = Array.from(paletaSeleccion).map(nombre => {
+                      const info = COLOR_PALETTE.find(p => p.nombre === nombre)!
+                      return { nombre, hex: info.hex, stock: generalStock, stock_minimo: stockMin }
+                    })
+                    setColoresDraft(prev => [...prev, ...toAdd])
+                    setPaletaSeleccion(new Set())
+                    setGeneralStock(0)
+                    setGeneralStockMinimo('')
+                    setColorError('')
+                  }}
+                  className="w-full h-8 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                >
+                  Agregar {paletaSeleccion.size} color{paletaSeleccion.size !== 1 ? 'es' : ''}
+                </button>
+              </div>
+            )}
+
             {/* Colores añadidos */}
             {coloresDraft.length > 0 && (
               <div className="space-y-2">
@@ -327,7 +419,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">Stock inicial</label>
                         <input
@@ -340,16 +432,15 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                         />
                       </div>
                       <div>
-                        <p className="text-xs text-slate-400 mb-1">Stock mínimo</p>
-                        <div className="h-8 px-2 rounded-lg border border-slate-100 bg-white text-sm flex items-center text-slate-500">
-                          {form.stock_minimo || '5'}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-1">Unidad</p>
-                        <div className="h-8 px-2 rounded-lg border border-slate-100 bg-white text-sm flex items-center text-slate-500">
-                          {form.unidad}
-                        </div>
+                        <label className="text-xs text-slate-400 block mb-1">Stock mínimo</label>
+                        <input
+                          type="number" min="0"
+                          value={c.stock_minimo}
+                          onChange={e => setColoresDraft(prev => prev.map((x, j) =>
+                            j === i ? { ...x, stock_minimo: parseInt(e.target.value) || 0 } : x
+                          ))}
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        />
                       </div>
                     </div>
                   </div>
@@ -357,17 +448,18 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
               </div>
             )}
 
-            {/* Paleta + campo nombre */}
+            {/* Color personalizado */}
             <div className="space-y-2">
+              <p className="text-xs text-slate-400">O agrega un color personalizado:</p>
               <div className="flex flex-wrap gap-1.5">
-                {COLOR_PALETTE.map(p => (
+                {COLOR_PALETTE.map(cp => (
                   <button
-                    key={p.hex}
+                    key={cp.hex}
                     type="button"
-                    onClick={() => { setNuevoColorHex(p.hex); setNuevoColorNombre(p.nombre); setColorError('') }}
-                    className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === p.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
-                    style={{ backgroundColor: p.hex }}
-                    title={p.nombre}
+                    onClick={() => { setNuevoColorHex(cp.hex); setNuevoColorNombre(cp.nombre); setColorError('') }}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === cp.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
+                    style={{ backgroundColor: cp.hex }}
+                    title={cp.nombre}
                   />
                 ))}
               </div>
@@ -386,7 +478,8 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                     if (coloresDraft.some(c => c.nombre.toLowerCase() === nuevoColorNombre.trim().toLowerCase())) {
                       setColorError('Ya existe ese color'); return
                     }
-                    setColoresDraft(prev => [...prev, { nombre: nuevoColorNombre.trim(), hex: nuevoColorHex, stock: 0 }])
+                    const stockMin = parseInt(form.stock_minimo) || 5
+                    setColoresDraft(prev => [...prev, { nombre: nuevoColorNombre.trim(), hex: nuevoColorHex, stock: 0, stock_minimo: stockMin }])
                     setNuevoColorNombre('')
                     setColorError('')
                   }}

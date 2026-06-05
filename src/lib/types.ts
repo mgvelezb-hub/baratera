@@ -136,12 +136,13 @@ export const TIPOS_MOVIMIENTO: Record<MovimientoTipo, { label: string; signo: 1 
 
 // ── Colores por producto ──────────────────────────────────────
 export interface ProductoColor {
-  id:          string
-  producto_id: string
-  nombre:      string
-  hex:         string
-  stock:       number
-  created_at:  string
+  id:           string
+  producto_id:  string
+  nombre:       string
+  hex:          string
+  stock:        number
+  stock_minimo: number | null   // null → usa el stock_minimo del producto padre
+  created_at:   string
 }
 
 // ── Ventas ────────────────────────────────────────────────────
