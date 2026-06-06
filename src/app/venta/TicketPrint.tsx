@@ -29,22 +29,29 @@ interface Props {
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
 // ── Print CSS para el documento del popup.
-// SIN @page con tamaño: el largo del ticket lo gobierna el DRIVER de la
-// impresora (configurar la Epson en modo "Recibo/Rollo" con corte
-// automático). Forzar el alto por CSS (medir contenido + @page exacto)
-// causaba cortes — por eso se removió. Solo @page { margin: 0 } para
-// aprovechar todo el ancho sin los márgenes que mete el navegador.
+// @page size: 58mm auto → ancho fijo de rollo térmico, alto determinado
+// por el contenido (no hay saltos de página artificiales).
+// height: auto en html/body evita el espacio en blanco que aparece cuando
+// el popup window tiene una altura fija y el browser lo rellena con vacío.
 const PRINT_CSS = `
-  @page { margin: 0; }
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: auto; }
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 15px;
-    line-height: 1.4;
+    font-size: 14px;
+    line-height: 1.35;
     width: 58mm;
-    padding: 1.5mm 2mm;        /* simétrico — sin margen marcado */
+    padding: 2mm 2mm 6mm 2mm;
     color: #000;
+    background: white;
   }
 `
 
@@ -79,16 +86,12 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — popup con script propio. Imprime en window.onload (el
-  //    layout ya está completo → no captura el ticket a medias) y cierra
-  //    en window.onafterprint (cuando TERMINA de imprimir), NUNCA de
-  //    inmediato: cerrar antes truncaba el spool en tickets largos
-  //    ("solo salía la primera parte"). Fallback de cierre a 30s.
-  //    SIN @page con tamaño: el largo lo gobierna el driver de la
-  //    impresora (ZKP5801, papel 58mm — usar tamaño "58mm roll" continuo).
+  // ── Print — popup con script propio. Imprime en window.onload y cierra
+  //    en window.onafterprint. Sin height fijo para que el browser no
+  //    rellene con espacio en blanco hasta el alto del popup.
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
-    const win = window.open('', '_blank', 'width=400,height=700')
+    const win = window.open('', '_blank', 'width=300')
     if (!win) return
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
@@ -143,7 +146,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
       if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
       if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} ${pluralUnidad(item.unidad, item.cantidadPiezas)}`)
       const qty   = parts.join(' + ')
-      const color = item.colorNombre ? ` · ${item.colorNombre}` : ''
+      const color = item.colorNombre ? ` / ${item.colorNombre}` : ''
       lines.push(`• ${item.nombre} (${qty}${color}) — ${formatMXN(item.subtotal)}`)
     })
 
@@ -208,7 +211,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
                 const uPzas = (item.cantidadCajas > 0 || item.unidad === 'caja') ? 'pza' : item.unidad
                 parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
               }
-              const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')
+              const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' / ')
               return (
                 <div key={i} style={{ marginBottom: '5px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
