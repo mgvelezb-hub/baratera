@@ -29,7 +29,7 @@ interface Props {
 type Tab = 'imprimir' | 'correo'
 
 const PRINT_CSS = `
-  @page { margin: 2mm; size: 58mm auto; }
+  @page { margin: 2mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
@@ -57,7 +57,7 @@ function Divider() {
 // 1500ms delay on close gives the ZKTeco time to receive full data
 // (onafterprint fires when Chrome submits to spooler, not on paper end).
 function openPrint(bodyHtml: string, css = PRINT_CSS): void {
-  const win = window.open('', '_blank', 'width=380,height=500')
+  const win = window.open('', '_blank', 'width=400,height=2000')
   if (!win) return
   win.document.write(
     '<!DOCTYPE html><html><head>' +
