@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -104,17 +104,47 @@ function LogoBlock() {
 }
 
 export default function Sidebar() {
-  const [open, setOpen] = useState(false)
+  const [open,         setOpen]         = useState(false)
+  const [desktopOpen,  setDesktopOpen]  = useState(true)
+
+  useEffect(() => {
+    if (localStorage.getItem('sidebar-desktop') === 'closed') setDesktopOpen(false)
+  }, [])
+
+  function toggleDesktop() {
+    const next = !desktopOpen
+    setDesktopOpen(next)
+    localStorage.setItem('sidebar-desktop', next ? 'open' : 'closed')
+  }
 
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-slate-200 bg-white h-screen sticky top-0">
-        <div className="flex items-center h-14 px-4 border-b border-slate-200">
-          <LogoBlock />
-        </div>
-        <NavContent />
-      </aside>
+      {desktopOpen ? (
+        <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-slate-200 bg-white h-screen sticky top-0">
+          <div className="flex items-center justify-between h-14 px-4 border-b border-slate-200">
+            <LogoBlock />
+            <button
+              onClick={toggleDesktop}
+              title="Ocultar menú"
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          </div>
+          <NavContent />
+        </aside>
+      ) : (
+        <aside className="hidden lg:flex flex-col w-12 shrink-0 border-r border-slate-200 bg-white h-screen sticky top-0 items-center pt-3 gap-3">
+          <button
+            onClick={toggleDesktop}
+            title="Mostrar menú"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-violet-50 text-slate-500 hover:text-violet-600 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </aside>
+      )}
 
       {/* ── Mobile top bar ───────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200 flex items-center justify-between h-14 px-4">

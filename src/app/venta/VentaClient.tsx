@@ -622,6 +622,7 @@ export default function VentaClient() {
   const [agregarModalProd,setAgregarModalProd] = useState<Producto | null>(null)
   const [colorPresel,     setColorPresel]      = useState<ProductoColor | null>(null)
   const [showCarrito,    setShowCarrito]    = useState(false)
+  const [showCartPanel,  setShowCartPanel]  = useState(true)
   const [showPayment,    setShowPayment]    = useState(false)
   const [confirmando,    setConfirmando]    = useState(false)
   const [ventaExitosa,   setVentaExitosa]   = useState<VentaExitosa | null>(null)
@@ -920,15 +921,30 @@ export default function VentaClient() {
       {/* ── Product area ────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="px-4 pt-4 pb-3 border-b border-slate-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nombre, SKU o categoría..."
-              className="w-full h-11 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por nombre, SKU o categoría..."
+                className="w-full h-11 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+            {/* Toggle carrito desktop */}
+            <button
+              onClick={() => setShowCartPanel(v => !v)}
+              title={showCartPanel ? 'Ocultar carrito' : 'Mostrar carrito'}
+              className="hidden lg:flex items-center justify-center w-11 h-11 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-violet-600 transition-colors shrink-0 relative"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {carrito.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {carrito.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -947,7 +963,7 @@ export default function VentaClient() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-24 lg:pb-4">
+            <div className={`grid gap-3 pb-24 lg:pb-4 ${showCartPanel ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'}`}>
               {productosFiltrados.map(p => (
                 <ProductoCardPOS
                   key={p.id}
@@ -964,7 +980,7 @@ export default function VentaClient() {
       </div>
 
       {/* ── Desktop cart ────────────────────────────────────── */}
-      <div className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white">
+      {showCartPanel && <div className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white">
         <div className="flex items-center justify-between h-14 px-4 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-slate-600" />
@@ -1005,7 +1021,7 @@ export default function VentaClient() {
           onConfirmar={() => setShowPayment(true)}
           confirmando={confirmando}
         />
-      </div>
+      </div>}
 
       {/* ── Mobile floating button ───────────────────────────── */}
       {totalProductos > 0 && !showCarrito && (
