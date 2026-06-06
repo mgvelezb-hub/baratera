@@ -105,16 +105,18 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     openPrint('<p>PRUEBA 2 — texto simple con PRINT_CSS</p><p>ZKTeco conecta OK.</p>')
   }
 
-  // ── Paso 3 — encabezado con PRINT_CSS ───────────────────────
-  // Si pasa: el CSS ya está bien, el problema era solo width:58mm.
+  // ── Paso 3 — encabezado idéntico al ticket real ─────────────
+  // LA MÁS y BARATERA van en dos <p> separados — una sola línea
+  // de 22px Courier New mide ~56mm y desborda el papel de 54mm útiles.
   function handlePaso3(): void {
     openPrint(
-      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px">' +
-      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px">PAPELERÍA</p>' +
-      '<p style="font-size:22px;font-weight:bold;line-height:1.05">LA MÁS BARATERA</p>' +
+      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px;margin:0">' +
+      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px;margin:0">PAPELERÍA</p>' +
+      '<p style="font-size:22px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">LA MÁS</p>' +
+      '<p style="font-size:22px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">BARATERA</p>' +
       '</div>' +
-      '<p style="text-align:center;font-size:11px">lamasbaratera.com.mx</p>' +
-      '<p style="text-align:center;font-size:12px">PRUEBA 3 - encabezado</p>'
+      '<p style="text-align:center;font-size:11px;margin:0">lamasbaratera.com.mx</p>' +
+      '<p style="text-align:center;font-size:12px;margin:0">PRUEBA 3 - encabezado correcto</p>'
     )
   }
 
