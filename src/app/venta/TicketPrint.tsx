@@ -28,8 +28,8 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo'
 
+// @page se inyecta dinámicamente en openPrint con el alto exacto del contenido.
 const PRINT_CSS = `
-  @page { margin: 2mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
@@ -53,11 +53,12 @@ function Divider() {
 }
 
 // ── Shared print helper ──────────────────────────────────────────
-// 80ms delay gives Chrome a layout frame before print() is called.
-// 1500ms delay on close gives the ZKTeco time to receive full data
-// (onafterprint fires when Chrome submits to spooler, not on paper end).
+// @page height se calcula dinámicamente DENTRO del popup para que
+// siempre quepa en una sola página sin importar el tamaño del pedido.
+// Popup a 400px de ancho; el print usa 50mm ≈ 189px → el contenido
+// es más alto en print. Factor ×2 + 40mm de buffer cubre la diferencia.
 function openPrint(bodyHtml: string, css = PRINT_CSS): void {
-  const win = window.open('', '_blank', 'width=400,height=2000')
+  const win = window.open('', '_blank', 'width=400,height=3000')
   if (!win) return
   win.document.write(
     '<!DOCTYPE html><html><head>' +
@@ -67,7 +68,15 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   )
   win.document.close()
   win.onafterprint = () => setTimeout(() => win.close(), 1500)
-  const go = () => { win.focus(); win.print() }
+  const go = () => {
+    const h = win.document.body.scrollHeight
+    const heightMm = Math.ceil(h * 0.265 * 2) + 40
+    const pageStyle = win.document.createElement('style')
+    pageStyle.textContent = `@page { size: 58mm ${heightMm}mm; margin: 2mm; }`
+    win.document.head.appendChild(pageStyle)
+    win.focus()
+    win.print()
+  }
   if (win.document.readyState === 'complete') {
     setTimeout(go, 80)
   } else {
