@@ -113,16 +113,16 @@ export default async function DashboardPage() {
     supabase.from('stock_ledger')
       .select('qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
       .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
+    supabase.from('cortes_caja')
+      .select('id, cajero_id, total_ventas, total_efectivo, total_tarjeta, total_transferencia, diferencia, num_transacciones, notas, created_at')
+      .order('created_at', { ascending: false })
+      .limit(8),
     supabase.from('stock_ledger')
       .select('producto_id, precio_unitario, proveedor_id, qty_antes, qty_despues, created_at, proveedores(nombre), productos(nombre, precio_menudeo, precio_caja, piezas_por_caja, unidad)')
       .in('tipo', ['entrada_compra', 'levantamiento_inventario'])
       .not('precio_unitario', 'is', null)
       .order('created_at', { ascending: false })
       .limit(100),
-    supabase.from('cortes_caja')
-      .select('id, cajero_id, total_ventas, total_efectivo, total_tarjeta, total_transferencia, diferencia, num_transacciones, notas, created_at')
-      .order('created_at', { ascending: false })
-      .limit(8),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
