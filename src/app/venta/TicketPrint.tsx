@@ -89,39 +89,6 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Paso 1 — texto mínimo, CSS mínimo (sin PRINT_CSS) ───────
-  // Confirma que popup + ZKTeco básico funcionan.
-  function handlePaso1(): void {
-    openPrint(
-      '<p>PRUEBA 1 — texto simple</p><p>ZKTeco conecta OK.</p>',
-      '@page{margin:2mm;size:58mm auto}body{font-family:monospace;font-size:14px;padding:2px}'
-    )
-  }
-
-  // ── Paso 2 — MISMO texto que Paso 1, CON PRINT_CSS (sin width) ──
-  // Si pasa: quitar width:58mm fue el fix correcto.
-  // Si falla: otro elemento del PRINT_CSS es el problema.
-  function handlePaso2(): void {
-    openPrint('<p>PRUEBA 2 — texto simple con PRINT_CSS</p><p>ZKTeco conecta OK.</p>')
-  }
-
-  // ── Paso 3 — div con bordes, fuente 10px sin letter-spacing ──
-  // border-top/bottom en un div provoca salto de pagina en Chrome print.
-  // Fix: reemplazar con div background:#000 height:2px (sin propiedad border).
-  function handlePaso3(): void {
-    openPrint(
-      '<div style="background:#000;height:2px"></div>' +
-      '<div style="text-align:center;padding:4px 0">' +
-      '<p>PAPELERIA</p>' +
-      '<p>LA MAS BARATERA</p>' +
-      '</div>' +
-      '<div style="background:#000;height:2px"></div>' +
-      '<p>lamasbaratera.com.mx</p>' +
-      '<p>PRUEBA 3 - lineas con background (sin border CSS)</p>'
-    )
-  }
-
-  // ── Paso 4 / handlePrint — ticket completo con diseño ───────
   function handlePrint(): void {
     const node = ticketRef.current
     if (!node) return
@@ -163,13 +130,6 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     { id: 'imprimir', label: 'Imprimir', Icon: Printer },
     { id: 'correo',   label: 'Correo',   Icon: Mail    },
   ] as const
-
-  const PASOS = [
-    { label: 'Paso 1', title: 'Texto sin PRINT_CSS',        fn: handlePaso1 },
-    { label: 'Paso 2', title: 'Texto con PRINT_CSS',        fn: handlePaso2 },
-    { label: 'Paso 3', title: 'Encabezado con PRINT_CSS',  fn: handlePaso3 },
-    { label: 'Paso 4', title: 'Ticket completo',            fn: handlePrint },
-  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
@@ -297,32 +257,13 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
           {/* Imprimir */}
           {tab === 'imprimir' && (
-            <div className="space-y-2">
-              <button
-                onClick={handlePrint}
-                className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Imprimir ticket
-              </button>
-
-              {/* Diagnóstico paso a paso */}
-              <div className="space-y-1.5">
-                <p className="text-xs text-slate-400 text-center">— diagnóstico —</p>
-                <div className="grid grid-cols-4 gap-1">
-                  {PASOS.map(({ label, title, fn }) => (
-                    <button
-                      key={label}
-                      onClick={fn}
-                      title={title}
-                      className="h-9 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={handlePrint}
+              className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <Printer className="w-4 h-4" />
+              Imprimir ticket
+            </button>
           )}
 
           {/* Correo */}
