@@ -38,10 +38,15 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   const [confirmEliminar, setConfirmEliminar] = useState(false)
   const [dangerLoading,   setDangerLoading]   = useState(false)
 
-  // Colores
+  // Colores existentes
   const [colores,          setColores]         = useState<ProductoColor[]>([])
   const [colorStocks,      setColorStocks]     = useState<Record<string, number>>({})
   const [colorMins,        setColorMins]       = useState<Record<string, string>>({})
+  // Multi-select para agregar colores nuevos
+  const [paletaSel,        setPaletaSel]       = useState<Set<string>>(new Set())
+  const [nuevoStockGen,    setNuevoStockGen]   = useState(0)
+  const [nuevoMinGen,      setNuevoMinGen]     = useState('')
+  // Color personalizado (nombre libre)
   const [nuevoColorHex,    setNuevoColorHex]   = useState(COLOR_PALETTE[0].hex)
   const [nuevoColorNombre, setNuevoColorNombre]= useState('')
   const [colorLoading,     setColorLoading]    = useState(false)
@@ -84,6 +89,51 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     setColorStocks(prev => ({ ...prev, [data.id]: 0 }))
     setColorMins(prev => ({ ...prev, [data.id]: '' }))
     setNuevoColorNombre('')
+    setColorLoading(false)
+  }
+
+  async function agregarColoresMultiple() {
+    if (paletaSel.size === 0) return
+    setColorLoading(true)
+    setColorError('')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const stockMin = parseInt(nuevoMinGen) || parseInt(form.stock_minimo) || 5
+    let stockActual = producto.stock_fisico
+
+    for (const nombre of Array.from(paletaSel)) {
+      if (colores.some(c => c.nombre === nombre)) continue
+      const info = COLOR_PALETTE.find(p => p.nombre === nombre)
+      if (!info) continue
+      const { data, error: err } = await supabase
+        .from('producto_colores')
+        .insert({ producto_id: producto.id, nombre, hex: info.hex, stock: nuevoStockGen, stock_minimo: stockMin || null })
+        .select().single()
+      if (err || !data) continue
+      if (nuevoStockGen > 0) {
+        const stockDespues = stockActual + nuevoStockGen
+        await supabase.from('stock_ledger').insert({
+          producto_id:    producto.id,
+          tipo:           'levantamiento_inventario',
+          qty_antes:      stockActual,
+          qty_despues:    stockDespues,
+          notas:          `Stock inicial color ${nombre}`,
+          canal:          'manual',
+          usuario_id:     user?.id ?? null,
+          color_variante: nombre,
+        })
+        stockActual = stockDespues
+      }
+      setColores(prev => [...prev, data])
+      setColorStocks(prev => ({ ...prev, [data.id]: nuevoStockGen }))
+      setColorMins(prev => ({ ...prev, [data.id]: stockMin ? String(stockMin) : '' }))
+    }
+    if (nuevoStockGen > 0) {
+      await supabase.from('productos').update({ stock_fisico: stockActual }).eq('id', producto.id)
+    }
+    setPaletaSel(new Set())
+    setNuevoStockGen(0)
+    setNuevoMinGen('')
     setColorLoading(false)
   }
 
@@ -448,34 +498,116 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               </div>
             )}
 
-            {/* Agregar color */}
-            <div className="space-y-2">
+            {/* ── Agregar colores (multi-select) ── */}
+            <div className="space-y-2 border-t border-slate-100 pt-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Agregar colores</p>
+              <p className="text-xs text-slate-400">Toca para seleccionar uno o varios:</p>
+
               <div className="flex flex-wrap gap-1.5">
-                {COLOR_PALETTE.map(p => (
+                {COLOR_PALETTE.map(cp => {
+                  const yaExiste = colores.some(c => c.nombre === cp.nombre)
+                  const isSel    = paletaSel.has(cp.nombre)
+                  return (
+                    <button
+                      key={cp.hex}
+                      type="button"
+                      disabled={yaExiste || colorLoading}
+                      onClick={() => {
+                        setColorError('')
+                        setPaletaSel(prev => {
+                          const n = new Set(prev)
+                          n.has(cp.nombre) ? n.delete(cp.nombre) : n.add(cp.nombre)
+                          return n
+                        })
+                      }}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-medium transition-all ${
+                        yaExiste
+                          ? 'opacity-30 cursor-not-allowed border-slate-100 text-slate-400'
+                          : isSel
+                            ? 'border-violet-500 bg-violet-50 text-violet-700'
+                            : 'border-slate-200 hover:border-violet-300 text-slate-600'
+                      }`}
+                    >
+                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: cp.hex }} />
+                      {cp.nombre}
+                      {isSel && <span className="text-violet-500 font-bold">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Panel de cantidad cuando hay selección */}
+              {paletaSel.size > 0 && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2.5">
+                  <p className="text-xs font-semibold text-violet-700">
+                    {paletaSel.size} color{paletaSel.size !== 1 ? 'es' : ''} seleccionado{paletaSel.size !== 1 ? 's' : ''}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Stock inicial para todos</label>
+                      <input
+                        type="number" min="0"
+                        value={nuevoStockGen}
+                        onChange={e => setNuevoStockGen(parseInt(e.target.value) || 0)}
+                        className="w-full h-8 px-2 rounded-lg border border-violet-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Stock mínimo para todos</label>
+                      <input
+                        type="number" min="0"
+                        value={nuevoMinGen}
+                        onChange={e => setNuevoMinGen(e.target.value)}
+                        placeholder={form.stock_minimo || '5'}
+                        className="w-full h-8 px-2 rounded-lg border border-violet-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                    </div>
+                  </div>
                   <button
-                    key={p.hex}
                     type="button"
-                    onClick={() => { setNuevoColorHex(p.hex); setNuevoColorNombre(p.nombre) }}
-                    className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === p.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
-                    style={{ backgroundColor: p.hex }}
-                    title={p.nombre}
+                    onClick={agregarColoresMultiple}
+                    disabled={colorLoading}
+                    className="w-full h-8 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    {colorLoading
+                      ? <><Loader2 className="w-3 h-3 animate-spin" />Guardando...</>
+                      : <>Agregar {paletaSel.size} color{paletaSel.size !== 1 ? 'es' : ''}</>
+                    }
+                  </button>
+                </div>
+              )}
+
+              {/* Color personalizado */}
+              <div className="space-y-2 pt-1">
+                <p className="text-xs text-slate-400">O agrega un color personalizado:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {COLOR_PALETTE.map(cp => (
+                    <button
+                      key={cp.hex}
+                      type="button"
+                      onClick={() => { setNuevoColorHex(cp.hex); setNuevoColorNombre(cp.nombre) }}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === cp.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
+                      style={{ backgroundColor: cp.hex }}
+                      title={cp.nombre}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={nuevoColorNombre}
+                    onChange={e => { setNuevoColorNombre(e.target.value); setColorError('') }}
+                    placeholder="Nombre personalizado"
+                    className="flex-1 h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
-                ))}
+                  <button type="button" onClick={agregarColor} disabled={colorLoading}
+                    className="h-9 px-3 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-lg flex items-center gap-1 transition-colors">
+                    <Plus className="w-3.5 h-3.5" />
+                    Agregar
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={nuevoColorNombre}
-                  onChange={e => { setNuevoColorNombre(e.target.value); setColorError('') }}
-                  placeholder="Nombre del color"
-                  className="flex-1 h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-                <button type="button" onClick={agregarColor} disabled={colorLoading}
-                  className="h-9 px-3 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold rounded-lg flex items-center gap-1 transition-colors">
-                  <Plus className="w-3.5 h-3.5" />
-                  Agregar
-                </button>
-              </div>
+
               {colorError && <p className="text-xs text-red-500">{colorError}</p>}
             </div>
           </div>
