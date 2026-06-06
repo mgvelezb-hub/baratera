@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Search, AlertTriangle, Package, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { calcularSemaforo } from '@/lib/types'
+import { calcularSemaforoEfectivo } from '@/lib/types'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import ProductoCard from '@/components/ProductoCard'
 import NuevoProductoModal from './NuevoProductoModal'
@@ -45,16 +45,16 @@ export default function InventarioClient() {
       p.sku?.toLowerCase().includes(search.toLowerCase()) ||
       p.categoria?.toLowerCase().includes(search.toLowerCase())
 
-    const sem = calcularSemaforo(p.stock_fisico, p.stock_minimo)
+    const sem = calcularSemaforoEfectivo(p, coloresMap.get(p.id) ?? [])
     const matchFiltro = filtro === 'todos' || sem === filtro
 
     return matchSearch && matchFiltro
   })
 
   const counts = {
-    rojo:    productos.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'rojo').length,
-    amarillo: productos.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'amarillo').length,
-    verde:   productos.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'verde').length,
+    rojo:     productos.filter(p => calcularSemaforoEfectivo(p, coloresMap.get(p.id) ?? []) === 'rojo').length,
+    amarillo: productos.filter(p => calcularSemaforoEfectivo(p, coloresMap.get(p.id) ?? []) === 'amarillo').length,
+    verde:    productos.filter(p => calcularSemaforoEfectivo(p, coloresMap.get(p.id) ?? []) === 'verde').length,
   }
 
   return (

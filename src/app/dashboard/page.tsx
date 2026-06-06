@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/AppShell'
 import SalesChart from './SalesChart'
 import type { ChartDay } from './SalesChart'
-import { calcularSemaforo, costoMensual, CATEGORIA_META } from '@/lib/types'
-import type { CostoFijo, CostoCategoria } from '@/lib/types'
+import { calcularSemaforo, calcularSemaforoEfectivo, costoMensual, CATEGORIA_META } from '@/lib/types'
+import type { CostoFijo, CostoCategoria, ProductoColor } from '@/lib/types'
 import {
   TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight,
   ShoppingCart, Zap, Monitor, Globe, RefreshCcw,
@@ -68,6 +68,7 @@ export default async function DashboardPage() {
     { data: ventasSemana },
     { data: ventasAnterior },
     { data: productos },
+    { data: coloresDB },
     { data: movimientos },
     { data: adeudosPendientes },
     { data: costosFijos },
@@ -81,6 +82,7 @@ export default async function DashboardPage() {
     supabase.from('ventas').select('total')
       .gte('created_at', fourteenAgo).lt('created_at', sevenAgo),
     supabase.from('productos').select('*').eq('activo', true).order('nombre'),
+    supabase.from('producto_colores').select('id, producto_id, nombre, stock, stock_minimo'),
     supabase.from('stock_ledger')
       .select('id, tipo, qty_antes, qty_despues, notas, canal, created_at, productos(nombre, unidad)')
       .order('created_at', { ascending: false }).limit(12),
@@ -111,8 +113,19 @@ export default async function DashboardPage() {
   const ticketPromedio   = transaccionesHoy > 0 ? ingresosHoy / transaccionesHoy : 0
   const entradasCount    = entradasHoy?.length ?? 0
 
-  const productosAlerta  = (productos ?? []).filter(p => p.stock_fisico < p.stock_minimo)
-  const productosRojo    = productosAlerta.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'rojo')
+  const coloresMapDB = new Map<string, ProductoColor[]>()
+  for (const c of (coloresDB ?? []) as ProductoColor[]) {
+    const arr = coloresMapDB.get(c.producto_id) ?? []
+    arr.push(c)
+    coloresMapDB.set(c.producto_id, arr)
+  }
+
+  const productosAlerta  = (productos ?? []).filter(p =>
+    calcularSemaforoEfectivo(p, coloresMapDB.get(p.id) ?? []) !== 'verde'
+  )
+  const productosRojo    = productosAlerta.filter(p =>
+    calcularSemaforoEfectivo(p, coloresMapDB.get(p.id) ?? []) === 'rojo'
+  )
   const totalActivos     = productos?.length ?? 0
 
   // ── Chart data ────────────────────────────────────────────
@@ -194,18 +207,18 @@ export default async function DashboardPage() {
   const alerts: AlertItem[] = []
 
   for (const p of productosRojo.slice(0, 3)) {
-    alerts.push({
-      level: 'danger',
-      title: `Stock crítico: ${p.nombre}`,
-      body:  `Solo ${p.stock_fisico} ${p.unidad} · mínimo ${p.stock_minimo}`,
-    })
+    const colores  = coloresMapDB.get(p.id) ?? []
+    const peor     = colores.find(c => calcularSemaforo(c.stock, c.stock_minimo ?? p.stock_minimo) === 'rojo')
+    const stockStr = peor ? `${peor.nombre}: ${peor.stock} pzas` : `${p.stock_fisico} ${p.unidad}`
+    const minStr   = peor ? `mín ${peor.stock_minimo ?? p.stock_minimo} pzas` : `mín ${p.stock_minimo} ${p.unidad}`
+    alerts.push({ level: 'danger', title: `Stock crítico: ${p.nombre}`, body: `${stockStr} · ${minStr}` })
   }
-  for (const p of productosAlerta.filter(p => calcularSemaforo(p.stock_fisico, p.stock_minimo) === 'amarillo').slice(0, 2)) {
-    alerts.push({
-      level: 'warn',
-      title: `Stock bajo: ${p.nombre}`,
-      body:  `${p.stock_fisico} ${p.unidad} · mínimo ${p.stock_minimo}`,
-    })
+  for (const p of productosAlerta.filter(p => calcularSemaforoEfectivo(p, coloresMapDB.get(p.id) ?? []) === 'amarillo').slice(0, 2)) {
+    const colores  = coloresMapDB.get(p.id) ?? []
+    const peor     = colores.find(c => calcularSemaforo(c.stock, c.stock_minimo ?? p.stock_minimo) !== 'verde')
+    const stockStr = peor ? `${peor.nombre}: ${peor.stock} pzas` : `${p.stock_fisico} ${p.unidad}`
+    const minStr   = peor ? `mín ${peor.stock_minimo ?? p.stock_minimo} pzas` : `mín ${p.stock_minimo} ${p.unidad}`
+    alerts.push({ level: 'warn', title: `Stock bajo: ${p.nombre}`, body: `${stockStr} · ${minStr}` })
   }
   if (alerts.length === 0) {
     alerts.push({ level: 'info', title: 'Stock en orden', body: 'Ningún producto bajo stock mínimo.' })

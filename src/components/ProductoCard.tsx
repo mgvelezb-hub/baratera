@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { MoreVertical, Plus, Pencil } from 'lucide-react'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { calcularSemaforo } from '@/lib/types'
+import { calcularSemaforo, calcularSemaforoEfectivo } from '@/lib/types'
 import { formatMXN, formatNum, formatStockConCajas } from '@/lib/utils'
 import SemaforoBadge from './Semaforobadge'
 import MovimientoModal from './MovimientoModal'
@@ -23,7 +23,7 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
   const [modalTipo,      setModalTipo]      = useState<'entrada_compra' | null>(null)
   const [colorActivo,    setColorActivo]    = useState<ProductoColor | null>(null)
 
-  const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
+  const semaforo = calcularSemaforoEfectivo(producto, colores)
   const semaforoActivo = colorActivo
     ? calcularSemaforo(colorActivo.stock, colorActivo.stock_minimo ?? producto.stock_minimo)
     : semaforo

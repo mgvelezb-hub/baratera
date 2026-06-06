@@ -47,6 +47,22 @@ export function calcularSemaforo(stockFisico: number, stockMinimo: number): Stoc
   return 'verde'
 }
 
+const SEMAFORO_ORDEN: Record<StockSemaforo, number> = { verde: 0, amarillo: 1, rojo: 2 }
+
+// Devuelve el peor semáforo entre el producto y cada color individual.
+// Si un color está crítico, el producto se considera crítico aunque el total esté bien.
+export function calcularSemaforoEfectivo(
+  producto: Pick<Producto, 'stock_fisico' | 'stock_minimo'>,
+  colores:   Pick<ProductoColor, 'stock' | 'stock_minimo'>[]
+): StockSemaforo {
+  let peor = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
+  for (const c of colores) {
+    const semColor = calcularSemaforo(c.stock, c.stock_minimo ?? producto.stock_minimo)
+    if (SEMAFORO_ORDEN[semColor] > SEMAFORO_ORDEN[peor]) peor = semColor
+  }
+  return peor
+}
+
 export function calcularStockDisponible(stockFisico: number): number {
   // Por ahora sin reservas activas — se ajusta cuando OMS esté activo
   return stockFisico
