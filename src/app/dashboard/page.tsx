@@ -21,15 +21,21 @@ const TIPO_META: Record<string, { label: string; color: string }> = {
   levantamiento_inventario: { label: 'Inventario',   color: 'text-slate-600 bg-slate-100' },
 }
 
+const TZ = 'America/Mexico_City'
+
+function fechaMx(d: Date): string {
+  return d.toLocaleDateString('es-MX', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
 function formatCorteDate(iso: string, now: Date): string {
-  const d       = new Date(iso)
-  const todayStr = now.toISOString().split('T')[0]
-  const yestStr  = new Date(now.getTime() - 86_400_000).toISOString().split('T')[0]
-  const dStr     = iso.split('T')[0]
-  const hora     = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-  if (dStr === todayStr) return `Hoy ${hora}`
-  if (dStr === yestStr)  return `Ayer ${hora}`
-  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) + ` ${hora}`
+  const d    = new Date(iso)
+  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+  const dMx  = fechaMx(d)
+  const hoyMx  = fechaMx(now)
+  const ayerMx = fechaMx(new Date(now.getTime() - 86_400_000))
+  if (dMx === hoyMx)  return `Hoy ${hora}`
+  if (dMx === ayerMx) return `Ayer ${hora}`
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: TZ }) + ` ${hora}`
 }
 
 function tiempoRelativo(dateStr: string): string {
@@ -199,7 +205,7 @@ export default async function DashboardPage() {
     const datePrefix = d.toISOString().split('T')[0]
     const dayVentas  = (ventasSemana ?? []).filter(v => v.created_at.startsWith(datePrefix))
     return {
-      fecha:         d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
+      fecha:         d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', timeZone: TZ }),
       ingresos:      dayVentas.reduce((s, v) => s + Number(v.total), 0),
       transacciones: dayVentas.length,
     }
@@ -325,7 +331,7 @@ export default async function DashboardPage() {
     alerts.push({ level: 'warn', title: `Pago en ${dias} días: ${prov}`, body: `${formatMXNFull(restante)} · ${a.descripcion}` })
   }
 
-  const fechaLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+  const fechaLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ })
 
   return (
     <AppShell>
