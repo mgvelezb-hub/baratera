@@ -69,8 +69,12 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   win.document.close()
   win.onafterprint = () => setTimeout(() => win.close(), 1500)
   const go = () => {
+    // Medir a 204px (= 54mm a 96dpi) — el ancho real del area imprimible en print.
+    // Así el wrapping de texto refleja cómo se verá en papel y el alto es preciso.
+    win.document.body.style.cssText = 'width:204px!important;overflow:hidden'
     const h = win.document.body.scrollHeight
-    const heightMm = Math.ceil(h * 0.265 * 2) + 40
+    win.document.body.style.cssText = ''
+    const heightMm = Math.ceil(h * 0.265) + 25
     const pageStyle = win.document.createElement('style')
     pageStyle.textContent = `@page { size: 58mm ${heightMm}mm; margin: 2mm; }`
     win.document.head.appendChild(pageStyle)
