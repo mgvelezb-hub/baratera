@@ -115,7 +115,7 @@ export default async function DashboardPage() {
       .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
     supabase.from('stock_ledger')
       .select('producto_id, precio_unitario, proveedor_id, qty_antes, qty_despues, created_at, proveedores(nombre), productos(nombre, precio_menudeo, precio_caja, piezas_por_caja, unidad)')
-      .eq('tipo', 'entrada_compra')
+      .in('tipo', ['entrada_compra', 'levantamiento_inventario'])
       .not('precio_unitario', 'is', null)
       .order('created_at', { ascending: false })
       .limit(100),
