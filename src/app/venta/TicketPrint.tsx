@@ -30,10 +30,10 @@ type Tab = 'imprimir' | 'correo'
 
 const PRINT_CSS = `
   @page { margin: 2mm; size: 58mm auto; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 2mm; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.3;
     padding: 1mm;
     color: #000;
@@ -49,7 +49,7 @@ function Row({ children, style }: { children: React.ReactNode; style?: React.CSS
 }
 
 function Divider() {
-  return <div style={{ borderTop: '1px dashed #555', margin: '5px 0' }} />
+  return <div style={{ borderTop: '1px dashed #000000', margin: '5px 0' }} />
 }
 
 // ── Shared print helper ──────────────────────────────────────────
@@ -111,9 +111,9 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   function handlePaso3(): void {
     openPrint(
       '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px;margin:0">' +
-      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px;margin:0">PAPELERÍA</p>' +
-      '<p style="font-size:22px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">LA MÁS</p>' +
-      '<p style="font-size:22px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">BARATERA</p>' +
+      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px;margin:0mm">PAPELERÍA</p>' +
+      '<p style="font-size:18px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">LA MÁS</p>' +
+      '<p style="font-size:18px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">BARATERA</p>' +
       '</div>' +
       '<p style="text-align:center;font-size:11px;margin:0">lamasbaratera.com.mx</p>' +
       '<p style="text-align:center;font-size:12px;margin:0">PRUEBA 3 - encabezado correcto</p>'
