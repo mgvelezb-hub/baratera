@@ -29,13 +29,13 @@ interface Props {
 type Tab = 'imprimir' | 'correo'
 
 const PRINT_CSS = `
-  @page { margin: 0; }
+  @page { margin: 2mm; size: 58mm auto; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     line-height: 1.3;
-    padding: 2mm;
+    padding: 1mm;
     color: #000;
   }
 `
@@ -94,7 +94,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   function handlePaso1(): void {
     openPrint(
       '<p>PRUEBA 1 — texto simple</p><p>ZKTeco conecta OK.</p>',
-      '@page{margin:0}body{font-family:monospace;font-size:14px;padding:4px}'
+      '@page{margin:2mm;size:58mm auto}body{font-family:monospace;font-size:14px;padding:2px}'
     )
   }
 
