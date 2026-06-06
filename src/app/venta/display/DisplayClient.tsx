@@ -76,7 +76,7 @@ export default function DisplayClient() {
                       <span>{cantDesc}</span>
                       {(item.ahorro ?? 0) > 0 && (
                         <span className="block text-sm text-green-600 font-semibold mt-0.5">
-                          Mayoreo · Ahorro: {formatMXN(item.ahorro!)}
+                          {item.cantidadCajas > 0 ? 'Precio caja' : 'Mayoreo'} · Ahorras: {formatMXN(item.ahorro!)}
                         </span>
                       )}
                     </td>

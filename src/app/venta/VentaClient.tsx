@@ -75,10 +75,19 @@ function maxPiezas(item: CartItem): number {
 
 function ahorroItem(item: CartItem): number {
   const p = item.producto
-  if (!p.precio_mayoreo || !p.umbral_mayoreo) return 0
-  const esMayoreo = item.cantidadCajas === 0 && item.cantidadPiezas >= p.umbral_mayoreo
-  if (!esMayoreo) return 0
-  return item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
+  let total = 0
+  // Ahorro por comprar caja vs piezas a precio menudeo
+  if (item.cantidadCajas > 0 && p.precio_caja && p.piezas_por_caja) {
+    total += Math.max(0,
+      item.cantidadCajas * p.piezas_por_caja * Number(p.precio_menudeo) -
+      item.cantidadCajas * Number(p.precio_caja)
+    )
+  }
+  // Ahorro por mayoreo vs menudeo (solo piezas sueltas, sin cajas)
+  if (item.cantidadCajas === 0 && p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo) {
+    total += item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
+  }
+  return total
 }
 
 function toTicketItems(items: CartItem[]): TicketItem[] {

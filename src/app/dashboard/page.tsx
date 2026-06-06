@@ -100,8 +100,8 @@ export default async function DashboardPage() {
       .select('id, tipo, qty_antes, qty_despues, notas, canal, created_at, productos(nombre, unidad)')
       .order('created_at', { ascending: false }).limit(12),
     supabase.from('adeudos')
-      .select('id, monto, fecha_vencimiento, estado, descripcion, proveedores(nombre)')
-      .eq('estado', 'pendiente')
+      .select('id, monto, monto_pagado, fecha_vencimiento, estado, descripcion, proveedores(nombre)')
+      .in('estado', ['pendiente', 'parcial'])
       .order('fecha_vencimiento', { ascending: true })
       .limit(4),
     supabase.from('costos_fijos').select('*').eq('activo', true),
@@ -190,7 +190,7 @@ export default async function DashboardPage() {
     return Math.ceil((venc.getTime() - hoy.getTime()) / 86_400_000)
   }
 
-  const totalAdeudado   = (adeudosPendientes ?? []).reduce((s, a) => s + Number(a.monto), 0)
+  const totalAdeudado   = (adeudosPendientes ?? []).reduce((s, a) => s + Math.max(0, Number(a.monto) - Number((a as any).monto_pagado ?? 0)), 0)
   const adeudosVencidos = (adeudosPendientes ?? []).filter(a => diasParaVencer(a.fecha_vencimiento) < 0)
   const adeudosUrgentes = (adeudosPendientes ?? []).filter(a => { const d = diasParaVencer(a.fecha_vencimiento); return d >= 0 && d <= 3 })
 
@@ -252,12 +252,14 @@ export default async function DashboardPage() {
   // Alertas de adeudos
   for (const a of adeudosVencidos.slice(0, 2)) {
     const prov = (a as any).proveedores?.nombre ?? 'Proveedor'
-    alerts.push({ level: 'danger', title: `Adeudo vencido: ${prov}`, body: `${formatMXNFull(Number(a.monto))} · ${a.descripcion}` })
+    const restante = Math.max(0, Number(a.monto) - Number((a as any).monto_pagado ?? 0))
+    alerts.push({ level: 'danger', title: `Adeudo vencido: ${prov}`, body: `${formatMXNFull(restante)} · ${a.descripcion}` })
   }
   for (const a of adeudosUrgentes.slice(0, 2)) {
     const prov = (a as any).proveedores?.nombre ?? 'Proveedor'
     const dias = diasParaVencer(a.fecha_vencimiento)
-    alerts.push({ level: 'warn', title: `Pago en ${dias} días: ${prov}`, body: `${formatMXNFull(Number(a.monto))} · ${a.descripcion}` })
+    const restante = Math.max(0, Number(a.monto) - Number((a as any).monto_pagado ?? 0))
+    alerts.push({ level: 'warn', title: `Pago en ${dias} días: ${prov}`, body: `${formatMXNFull(restante)} · ${a.descripcion}` })
   }
 
   const fechaLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -566,11 +568,14 @@ export default async function DashboardPage() {
                            `Vence en ${dias} días`}
                         </p>
                       </div>
-                      <span className={`text-sm font-bold shrink-0 ${
-                        vencido ? 'text-red-600' : urgente ? 'text-amber-600' : 'text-slate-900'
-                      }`}>
-                        {formatMXNFull(Number(a.monto))}
-                      </span>
+                      <div className="text-right shrink-0">
+                        <p className={`text-sm font-bold ${vencido ? 'text-red-600' : urgente ? 'text-amber-600' : 'text-slate-900'}`}>
+                          {formatMXNFull(Math.max(0, Number(a.monto) - Number((a as any).monto_pagado ?? 0)))}
+                        </p>
+                        {(a as any).estado === 'parcial' && (
+                          <p className="text-[10px] text-amber-600 font-medium">Pago parcial</p>
+                        )}
+                      </div>
                     </li>
                   )
                 })}
