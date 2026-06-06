@@ -251,7 +251,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
           {form.precio_mayoreo && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Cantidad mínima para mayoreo
+                Cantidad mínima para mayoreo <span className="font-normal text-slate-400">(pzas)</span>
               </label>
               <input
                 type="number"
@@ -261,6 +261,11 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                 className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 placeholder="Ej: 12"
               />
+              {form.piezas_por_caja && form.umbral_mayoreo && (
+                <p className="text-xs text-slate-400 mt-1">
+                  ≥ {form.umbral_mayoreo} pzas sueltas → precio mayoreo (independiente de cajas)
+                </p>
+              )}
             </div>
           )}
 

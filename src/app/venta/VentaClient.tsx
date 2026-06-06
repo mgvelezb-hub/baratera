@@ -357,12 +357,16 @@ function AgregarProductoModal({
                 <span className="text-sm text-slate-600">{tieneCaja ? 'Piezas' : 'Cantidad'}</span>
                 <Stepper value={piezas} max={maxPiezasN} onChange={setPiezas} color="slate" label={piezasLabel} />
               </div>
-              <p className="text-xs text-slate-400 text-right">
-                {formatStockConCajas(stockDisp, producto.piezas_por_caja, producto.unidad)} disponibles
-                {tieneCaja && producto.piezas_por_caja && (
-                  <span className="ml-1 text-slate-300">({formatNum(stockDisp)} pzas)</span>
-                )}
-              </p>
+              <div className="flex items-center justify-between">
+                {tieneCaja && producto.piezas_por_caja ? (
+                  <span className="text-xs text-slate-400 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    1 caja = {formatNum(producto.piezas_por_caja)} pzas
+                  </span>
+                ) : <span />}
+                <p className="text-xs text-slate-400 text-right">
+                  {formatStockConCajas(stockDisp, producto.piezas_por_caja, producto.unidad)} disponibles
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -454,7 +458,7 @@ function CartItemRow({
 }) {
   const p         = item.producto
   const tieneCaja = !!p.piezas_por_caja
-  const esMayoreo = !tieneCaja &&
+  const esMayoreo = item.cantidadCajas === 0 &&
     p.precio_mayoreo && p.umbral_mayoreo &&
     item.cantidadPiezas >= p.umbral_mayoreo
 

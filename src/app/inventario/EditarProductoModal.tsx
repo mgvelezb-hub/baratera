@@ -391,7 +391,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Cantidad mín. mayoreo
+                Cantidad mín. mayoreo <span className="font-normal text-slate-400">(pzas)</span>
               </label>
               <input
                 type="number"
@@ -402,6 +402,11 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                 className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-50 disabled:text-slate-400"
                 placeholder="Ej: 12"
               />
+              {parseInt(form.piezas_por_caja) > 0 && form.umbral_mayoreo && (
+                <p className="text-xs text-slate-400 mt-1">
+                  ≥ {form.umbral_mayoreo} pzas sueltas → precio mayoreo
+                </p>
+              )}
             </div>
           </div>
 
