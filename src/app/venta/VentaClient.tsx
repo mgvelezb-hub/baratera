@@ -233,27 +233,35 @@ function AgregarProductoModal({
   colores:      ProductoColor[]
   colorPresel?: ProductoColor | null
   onClose:      () => void
-  onConfirm:    (cajas: number, piezas: number, color: ProductoColor | null) => void
+  onConfirm:    (cajas: number, piezas: number, colors: ProductoColor[]) => void
 }) {
   const tieneColores = colores.length > 0
   const tieneCaja    = !!producto.piezas_por_caja
 
-  // Arranca con el color pre-seleccionado (cuando se tapea el swatch en la card)
-  const [colorSel, setColorSel] = useState<ProductoColor | null>(colorPresel)
-  const [cajas,    setCajas]    = useState(0)
-  const [piezas,   setPiezas]   = useState(0)
+  // Multi-select: arranca con el color pre-seleccionado si viene de un swatch
+  const [coloresSel, setColoresSel] = useState<Set<string>>(
+    colorPresel ? new Set([colorPresel.id]) : new Set()
+  )
+  const [cajas,  setCajas]  = useState(0)
+  const [piezas, setPiezas] = useState(0)
 
-  const stockDisp      = colorSel ? colorSel.stock : tieneColores ? 0 : producto.stock_fisico
-  const maxCajasN      = tieneCaja && stockDisp > 0 ? Math.floor(stockDisp / producto.piezas_por_caja!) : 0
-  const maxPiezasN     = Math.max(0, stockDisp - cajas * (producto.piezas_por_caja ?? 0))
-  const colorPendiente = tieneColores && !colorSel
-  const puedeAceptar   = !colorPendiente && (cajas > 0 || piezas > 0)
-  // Cuando el producto tiene cajas Y su unidad es 'caja', las piezas sueltas usan 'pza'
-  const piezasLabel    = tieneCaja && producto.unidad === 'caja' ? 'pza' : producto.unidad
+  const selectedColores = colores.filter(c => coloresSel.has(c.id))
+  const colorPendiente  = tieneColores && coloresSel.size === 0
+  const stockDisp       = selectedColores.length > 0
+    ? Math.min(...selectedColores.map(c => c.stock))
+    : tieneColores ? 0 : producto.stock_fisico
+  const maxCajasN  = tieneCaja && stockDisp > 0 ? Math.floor(stockDisp / producto.piezas_por_caja!) : 0
+  const maxPiezasN = Math.max(0, stockDisp - cajas * (producto.piezas_por_caja ?? 0))
+  const puedeAceptar = !colorPendiente && (cajas > 0 || piezas > 0)
+  const piezasLabel  = tieneCaja && producto.unidad === 'caja' ? 'pza' : producto.unidad
 
-  function handleSelectColor(c: ProductoColor) {
+  function handleToggleColor(c: ProductoColor) {
     if (c.stock <= 0) return
-    setColorSel(c)
+    setColoresSel(prev => {
+      const n = new Set(prev)
+      n.has(c.id) ? n.delete(c.id) : n.add(c.id)
+      return n
+    })
     setCajas(0)
     setPiezas(0)
   }
@@ -284,32 +292,45 @@ function AgregarProductoModal({
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2.5">
                 Color
-                {colorSel
-                  ? <span className="text-violet-600 normal-case font-medium ml-1">· {colorSel.nombre}</span>
-                  : <span className="text-red-500 normal-case font-medium ml-1">· elige uno</span>
+                {coloresSel.size === 0
+                  ? <span className="text-red-500 normal-case font-medium ml-1">· elige uno o más</span>
+                  : coloresSel.size === 1
+                    ? <span className="text-violet-600 normal-case font-medium ml-1">· {selectedColores[0]?.nombre}</span>
+                    : <span className="text-violet-600 normal-case font-medium ml-1">· {coloresSel.size} colores</span>
                 }
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {colores.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleSelectColor(c)}
-                    disabled={c.stock <= 0}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
-                      colorSel?.id === c.id
-                        ? 'border-violet-500 bg-violet-50'
-                        : c.stock <= 0
-                          ? 'border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed'
-                          : 'border-slate-200 hover:border-violet-300 active:scale-[0.97]'
-                    }`}
-                  >
-                    <span className="w-5 h-5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{c.nombre}</p>
-                      <p className="text-xs text-slate-400">{formatNum(c.stock)} disp.</p>
-                    </div>
-                  </button>
-                ))}
+                {colores.map(c => {
+                  const isSel = coloresSel.has(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => handleToggleColor(c)}
+                      disabled={c.stock <= 0}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                        isSel
+                          ? 'border-violet-500 bg-violet-50'
+                          : c.stock <= 0
+                            ? 'border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed'
+                            : 'border-slate-200 hover:border-violet-300 active:scale-[0.97]'
+                      }`}
+                    >
+                      <span className="w-5 h-5 rounded-full border border-black/10 shrink-0 relative" style={{ backgroundColor: c.hex }}>
+                        {isSel && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white drop-shadow" fill="none" viewBox="0 0 12 12">
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
+                        )}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{c.nombre}</p>
+                        <p className="text-xs text-slate-400">{formatNum(c.stock)} disp.</p>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -346,11 +367,11 @@ function AgregarProductoModal({
             Cancelar
           </button>
           <button
-            onClick={() => onConfirm(cajas, piezas, colorSel)}
+            onClick={() => onConfirm(cajas, piezas, selectedColores)}
             disabled={!puedeAceptar}
             className="flex-1 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold transition-colors"
           >
-            Agregar
+            {coloresSel.size > 1 ? `Agregar (×${coloresSel.size})` : 'Agregar'}
           </button>
         </div>
       </div>
@@ -664,38 +685,42 @@ export default function VentaClient() {
     setAgregarModalProd(producto)
   }
 
-  function confirmarAgregarAlCarrito(cajas: number, piezas: number, color: ProductoColor | null) {
-    const producto    = agregarModalProd!
-    const colorNombre = color?.nombre ?? null
-    const colorStock  = color?.stock
+  function confirmarAgregarAlCarrito(cajas: number, piezas: number, colors: ProductoColor[]) {
+    const producto = agregarModalProd!
     setAgregarModalProd(null)
+    setColorPresel(null)
     if (cajas === 0 && piezas === 0) return
 
+    // Genera una entrada por color (o una sin color si no hay colores)
+    const entries = colors.length > 0
+      ? colors.map(c => ({ colorNombre: c.nombre as string | null, colorStock: c.stock as number | undefined }))
+      : [{ colorNombre: null as string | null, colorStock: undefined as number | undefined }]
+
     setCarrito(prev => {
-      const key = `${producto.id}-${colorNombre ?? ''}`
-      const idx = prev.findIndex(i => cartKey(i) === key)
+      let next = [...prev]
+      for (const { colorNombre, colorStock } of entries) {
+        const key = `${producto.id}-${colorNombre ?? ''}`
+        const idx = next.findIndex(i => cartKey(i) === key)
 
-      if (idx >= 0) {
-        // Ya en carrito: sumar cantidades sin exceder stock
-        const existing  = prev[idx]
-        const stockLim  = colorStock ?? producto.stock_fisico
-        const maxC      = producto.piezas_por_caja ? Math.floor(stockLim / producto.piezas_por_caja) : 0
-        const newCajas  = Math.min(existing.cantidadCajas + cajas, maxC)
-        const cajasPzs  = newCajas * (producto.piezas_por_caja ?? 0)
-        const newPiezas = Math.min(existing.cantidadPiezas + piezas, Math.max(0, stockLim - cajasPzs))
-        const updated   = [...prev]
-        updated[idx]    = { ...existing, cantidadCajas: newCajas, cantidadPiezas: newPiezas }
-        return updated
+        if (idx >= 0) {
+          const existing  = next[idx]
+          const stockLim  = colorStock ?? producto.stock_fisico
+          const maxC      = producto.piezas_por_caja ? Math.floor(stockLim / producto.piezas_por_caja) : 0
+          const newCajas  = Math.min(existing.cantidadCajas + cajas, maxC)
+          const cajasPzs  = newCajas * (producto.piezas_por_caja ?? 0)
+          const newPiezas = Math.min(existing.cantidadPiezas + piezas, Math.max(0, stockLim - cajasPzs))
+          next = next.map((item, i) => i === idx ? { ...item, cantidadCajas: newCajas, cantidadPiezas: newPiezas } : item)
+        } else {
+          next = [...next, {
+            producto,
+            cantidadCajas:  cajas,
+            cantidadPiezas: piezas,
+            colorNombre,
+            ...(colorStock !== undefined ? { colorStock } : {}),
+          }]
+        }
       }
-
-      // Nuevo ítem
-      return [...prev, {
-        producto,
-        cantidadCajas:  cajas,
-        cantidadPiezas: piezas,
-        colorNombre,
-        ...(colorStock !== undefined ? { colorStock } : {}),
-      }]
+      return next
     })
   }
 
