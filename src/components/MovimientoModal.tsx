@@ -97,6 +97,8 @@ export default function MovimientoModal({
   const esModoMultiColor = esEntrada && tieneColores
   const ppc              = producto.piezas_por_caja ?? 0
   const tieneCajaEntrada = ppc > 0
+  // Cuando la unidad del producto es 'caja', las piezas sueltas se etiquetan 'pza'
+  const piezasLabel      = tieneCajaEntrada && producto.unidad === 'caja' ? 'pza' : producto.unidad
   const tipoConfig       = TIPOS_MOVIMIENTO[tipo]
   const cantidadNum      = parseInt(cantidad) || 0
 
@@ -317,7 +319,7 @@ export default function MovimientoModal({
                   {tieneCajaEntrada && (
                     <StepperInline value={bulkCajas} onChange={setBulkCajas} color="amber" label="caja" />
                   )}
-                  <StepperInline value={bulkPiezas} onChange={setBulkPiezas} color="slate" label={producto.unidad} />
+                  <StepperInline value={bulkPiezas} onChange={setBulkPiezas} color="slate" label={piezasLabel} />
                   <button
                     type="button"
                     onClick={aplicarATodos}
@@ -372,7 +374,7 @@ export default function MovimientoModal({
                           value={q.piezas}
                           onChange={v => setCantColor(c.nombre, 'piezas', v)}
                           color="slate"
-                          label={producto.unidad}
+                          label={piezasLabel}
                         />
                       </div>
                     </div>

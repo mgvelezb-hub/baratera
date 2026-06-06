@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatNum, formatStockConCajas } from '@/lib/utils'
+import type { Proveedor } from '@/lib/types'
 
 const COLOR_PALETTE = [
   { nombre: 'Rojo',      hex: '#ef4444' },
@@ -40,6 +41,10 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
   const [nuevoColorHex,        setNuevoColorHex]        = useState(COLOR_PALETTE[0].hex)
   const [nuevoColorNombre,     setNuevoColorNombre]     = useState('')
   const [colorError,           setColorError]           = useState('')
+  const [proveedores,          setProveedores]          = useState<Pick<Proveedor, 'id' | 'nombre'>[]>([])
+  const [proveedorId,          setProveedorId]          = useState('')
+  const [nuevoProvNombre,      setNuevoProvNombre]      = useState('')
+  const [precioUnitario,       setPrecioUnitario]       = useState('')
   const [form, setForm] = useState({
     nombre: '',
     sku: '',
@@ -55,6 +60,11 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     categoria: '',
   })
 
+  useEffect(() => {
+    createClient().from('proveedores').select('id, nombre').eq('activo', true).order('nombre')
+      .then(({ data }) => setProveedores(data ?? []))
+  }, [])
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
     setError('')
@@ -69,6 +79,17 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+
+    // Resolver proveedor
+    let finalProveedorId: string | null = null
+    if (proveedorId === 'nuevo' && nuevoProvNombre.trim()) {
+      const { data: newProv } = await supabase.from('proveedores')
+        .insert({ nombre: nuevoProvNombre.trim() }).select('id').single()
+      finalProveedorId = newProv?.id ?? null
+    } else if (proveedorId) {
+      finalProveedorId = proveedorId
+    }
+    const precioNum = precioUnitario ? parseFloat(precioUnitario) : null
 
     // Si hay piezas_por_caja, el stock del color se ingresó en esa unidad — convertir a piezas
     const ppc = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
@@ -116,27 +137,31 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
         }
         if (stockPiezas > 0) {
           await supabase.from('stock_ledger').insert({
-            producto_id:    producto.id,
-            tipo:           'levantamiento_inventario',
-            qty_antes:      stockAcum,
-            qty_despues:    stockAcum + stockPiezas,
-            notas:          `Stock inicial — color ${c.nombre}`,
-            canal:          'manual',
-            usuario_id:     user?.id ?? null,
-            color_variante: c.nombre,
+            producto_id:     producto.id,
+            tipo:            'levantamiento_inventario',
+            qty_antes:       stockAcum,
+            qty_despues:     stockAcum + stockPiezas,
+            notas:           `Stock inicial — color ${c.nombre}`,
+            canal:           'manual',
+            usuario_id:      user?.id ?? null,
+            color_variante:  c.nombre,
+            proveedor_id:    finalProveedorId,
+            precio_unitario: precioNum,
           })
           stockAcum += stockPiezas
         }
       }
     } else if (stockInicial > 0) {
       await supabase.from('stock_ledger').insert({
-        producto_id: producto.id,
-        tipo:        'levantamiento_inventario',
-        qty_antes:   0,
-        qty_despues: stockInicial,
-        notas:       'Stock inicial al crear producto',
-        canal:       'manual',
-        usuario_id:  user?.id ?? null,
+        producto_id:     producto.id,
+        tipo:            'levantamiento_inventario',
+        qty_antes:       0,
+        qty_despues:     stockInicial,
+        notas:           'Stock inicial al crear producto',
+        canal:           'manual',
+        usuario_id:      user?.id ?? null,
+        proveedor_id:    finalProveedorId,
+        precio_unitario: precioNum,
       })
     }
 
@@ -508,6 +533,56 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                 </button>
               </div>
               {colorError && <p className="text-xs text-red-500">{colorError}</p>}
+            </div>
+          </div>
+
+          {/* ── Datos de compra (opcional) ─────────────────── */}
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Datos de compra <span className="normal-case font-normal text-slate-400">(opcional)</span>
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Proveedor</label>
+              <select
+                value={proveedorId}
+                onChange={e => setProveedorId(e.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+              >
+                <option value="">— Sin especificar —</option>
+                {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                <option value="nuevo">+ Agregar nuevo proveedor</option>
+              </select>
+            </div>
+            {proveedorId === 'nuevo' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nombre del proveedor *</label>
+                <input
+                  type="text" value={nuevoProvNombre}
+                  onChange={e => setNuevoProvNombre(e.target.value)}
+                  placeholder="Ej: Distribuidora Norte"
+                  className="w-full h-11 px-3 rounded-lg border border-violet-300 bg-violet-50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Precio de compra <span className="font-normal text-slate-400">(por {form.unidad || 'unidad'})</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                <input
+                  type="number" min="0" step="0.01" value={precioUnitario}
+                  onChange={e => setPrecioUnitario(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full h-11 pl-7 pr-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              {precioUnitario && form.precio_menudeo && parseFloat(precioUnitario) > 0 && parseFloat(form.precio_menudeo) > 0 && (
+                <p className="text-xs text-green-700 mt-1 font-medium">
+                  Margen estimado:{' '}
+                  {Math.round((1 - parseFloat(precioUnitario) / parseFloat(form.precio_menudeo)) * 100)}%
+                </p>
+              )}
             </div>
           </div>
 

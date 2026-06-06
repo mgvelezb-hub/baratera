@@ -87,6 +87,7 @@ export default async function DashboardPage() {
     { data: comprasMes },
     { data: ledgerSemana },
     { data: cortesDB },
+    { data: entradasConCosto },
   ] = await Promise.all([
     supabase.from('ventas').select('total').gte('created_at', todayStart),
     supabase.from('stock_ledger').select('id')
@@ -112,6 +113,12 @@ export default async function DashboardPage() {
     supabase.from('stock_ledger')
       .select('qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
       .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
+    supabase.from('stock_ledger')
+      .select('producto_id, precio_unitario, proveedor_id, qty_antes, qty_despues, created_at, proveedores(nombre), productos(nombre, precio_menudeo, precio_caja, piezas_por_caja, unidad)')
+      .eq('tipo', 'entrada_compra')
+      .not('precio_unitario', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100),
     supabase.from('cortes_caja')
       .select('id, cajero_id, total_ventas, total_efectivo, total_tarjeta, total_transferencia, diferencia, num_transacciones, notas, created_at')
       .order('created_at', { ascending: false })
@@ -136,6 +143,30 @@ export default async function DashboardPage() {
     arr.push(c)
     coloresMapDB.set(c.producto_id, arr)
   }
+
+  // ── Margen estimado por producto ─────────────────────────────
+  // Toma el último precio_unitario conocido de cada producto y lo
+  // compara contra precio_menudeo para calcular el margen bruto.
+  type MargenItem = { nombre: string; costoUnit: number; precioVenta: number; margen: number; proveedor: string | null; unidad: string }
+  const margenMap = new Map<string, MargenItem>()
+  for (const e of (entradasConCosto ?? []) as any[]) {
+    if (margenMap.has(e.producto_id)) continue  // ya tenemos el más reciente
+    const prod = e.productos
+    if (!prod) continue
+    const ppc      = prod.piezas_por_caja ?? 0
+    const costoUnit = Number(e.precio_unitario)             // precio por unidad del producto (caja o pza)
+    const ventaUnit  = Number(prod.precio_menudeo)          // precio de venta por unidad
+    const margen = ventaUnit > 0 ? Math.round((1 - costoUnit / ventaUnit) * 100) : 0
+    margenMap.set(e.producto_id, {
+      nombre:      prod.nombre,
+      costoUnit,
+      precioVenta: ventaUnit,
+      margen,
+      proveedor:   e.proveedores?.nombre ?? null,
+      unidad:      prod.unidad,
+    })
+  }
+  const margenItems = [...margenMap.values()].sort((a, b) => b.margen - a.margen)
 
   // Mapa cajero_id → nombre (parte local del email)
   const cajeroMap = new Map<string, string>()
@@ -631,6 +662,73 @@ export default async function DashboardPage() {
           </div>
 
         </div>
+
+        {/* ── Margen por producto ───────────────────────────── */}
+        {margenItems.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Margen estimado por producto</p>
+                <p className="text-xs text-slate-400 mt-0.5">Basado en el último precio de compra registrado</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Producto</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Costo</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Venta</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Margen</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Proveedor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {margenItems.slice(0, 8).map((item, i) => {
+                    const margenColor = item.margen >= 40 ? 'text-green-600'
+                      : item.margen >= 20               ? 'text-amber-600'
+                      : item.margen >= 0                ? 'text-red-500'
+                      : 'text-red-700'
+                    const barW = Math.max(0, Math.min(100, item.margen))
+                    const barColor = item.margen >= 40 ? '#22c55e' : item.margen >= 20 ? '#f59e0b' : '#ef4444'
+                    return (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <p className="text-xs font-semibold text-slate-800 truncate max-w-[180px]">{item.nombre}</p>
+                          <p className="text-[10px] text-slate-400">por {item.unidad}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-slate-600 tabular-nums">
+                          {formatMXNFull(item.costoUnit)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-slate-600 tabular-nums">
+                          {formatMXNFull(item.precioVenta)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0">
+                              <div className="h-full rounded-full" style={{ width: `${barW}%`, background: barColor }} />
+                            </div>
+                            <span className={`text-xs font-bold tabular-nums ${margenColor}`}>
+                              {item.margen}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500 truncate max-w-[120px]">
+                          {item.proveedor ?? <span className="text-slate-300">—</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {margenItems.length === 0 && (
+              <p className="px-5 py-8 text-sm text-slate-400 text-center">
+                Registra precios de compra en las entradas de inventario para ver el margen.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Cortes de caja ────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
