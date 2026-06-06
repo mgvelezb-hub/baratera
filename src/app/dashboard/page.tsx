@@ -659,7 +659,7 @@ export default async function DashboardPage() {
                     <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Fecha / Hora</th>
                     <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Cajero</th>
                     <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ventas</th>
-                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Efectivo</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pagos</th>
                     <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</th>
                     <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Diferencia</th>
                   </tr>
@@ -692,14 +692,27 @@ export default async function DashboardPage() {
                             {c.num_transacciones}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs text-slate-500 tabular-nums whitespace-nowrap">
-                          {formatMXNFull(Number(c.total_efectivo))}
-                          {Number(c.total_tarjeta) > 0 && (
-                            <span className="ml-1 text-blue-500">+{formatMXN(Number(c.total_tarjeta))}</span>
-                          )}
-                          {Number(c.total_transferencia) > 0 && (
-                            <span className="ml-1 text-violet-500">+{formatMXN(Number(c.total_transferencia))}</span>
-                          )}
+                        <td className="px-4 py-2.5 text-right">
+                          <div className="flex flex-col items-end gap-0.5">
+                            {Number(c.total_efectivo) > 0 && (
+                              <span className="text-xs tabular-nums">
+                                <span className="text-[10px] text-green-600 font-medium mr-1">Ef.</span>
+                                <span className="text-slate-700">{formatMXNFull(Number(c.total_efectivo))}</span>
+                              </span>
+                            )}
+                            {Number(c.total_tarjeta) > 0 && (
+                              <span className="text-xs tabular-nums">
+                                <span className="text-[10px] text-blue-600 font-medium mr-1">Tarj.</span>
+                                <span className="text-slate-700">{formatMXNFull(Number(c.total_tarjeta))}</span>
+                              </span>
+                            )}
+                            {Number(c.total_transferencia) > 0 && (
+                              <span className="text-xs tabular-nums">
+                                <span className="text-[10px] text-violet-600 font-medium mr-1">Transf.</span>
+                                <span className="text-slate-700">{formatMXNFull(Number(c.total_transferencia))}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs font-semibold text-slate-800 tabular-nums whitespace-nowrap">
                           {formatMXNFull(Number(c.total_ventas))}
