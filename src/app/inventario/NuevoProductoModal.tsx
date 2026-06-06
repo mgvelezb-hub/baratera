@@ -87,7 +87,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
         precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
         piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
         stock_fisico: stockInicial,
-        stock_minimo: parseInt(form.stock_minimo) || 5,
+        stock_minimo: ((parseInt(form.stock_minimo) || 5)) * (ppc > 0 ? ppc : 1),
         unidad: form.unidad,
         categoria: form.categoria || null,
       })
@@ -108,10 +108,11 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
         const { data: colorRow } = await supabase.from('producto_colores')
           .insert({ producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: stockPiezas })
           .select().single()
-        // stock_minimo por color — falla silenciosamente si la migración aún no se corrió
-        if (colorRow && c.stock_minimo > 0) {
+        // stock_minimo por color — convertido a piezas igual que stock
+        const minPiezas = ppc > 0 ? c.stock_minimo * ppc : c.stock_minimo
+        if (colorRow && minPiezas > 0) {
           await supabase.from('producto_colores')
-            .update({ stock_minimo: c.stock_minimo }).eq('id', colorRow.id)
+            .update({ stock_minimo: minPiezas }).eq('id', colorRow.id)
         }
         if (stockPiezas > 0) {
           await supabase.from('stock_ledger').insert({

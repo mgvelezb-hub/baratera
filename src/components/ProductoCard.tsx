@@ -117,8 +117,8 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
               </p>
               <p className="text-xs text-slate-400 mt-1">
                 {colorActivo
-                  ? `${colorActivo.nombre} · mín ${formatNum(colorActivo.stock_minimo ?? producto.stock_minimo)}`
-                  : `Mínimo: ${formatNum(producto.stock_minimo)} ${producto.unidad}`
+                  ? `${colorActivo.nombre} · mín ${formatStockConCajas(colorActivo.stock_minimo ?? producto.stock_minimo, producto.piezas_por_caja, producto.unidad)}`
+                  : `Mínimo: ${formatStockConCajas(producto.stock_minimo, producto.piezas_por_caja, producto.unidad)}`
                 }
               </p>
             </div>

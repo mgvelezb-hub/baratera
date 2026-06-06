@@ -70,7 +70,10 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     for (const c of colores) {
       stocks[c.id] = c.stock
       cajas[c.id]  = ppc > 0 ? Math.floor(c.stock / ppc) : c.stock
-      mins[c.id]   = c.stock_minimo !== null && c.stock_minimo !== undefined ? String(c.stock_minimo) : ''
+      const dbMin  = c.stock_minimo
+      mins[c.id]   = dbMin !== null && dbMin !== undefined
+        ? String(ppc > 0 ? Math.round(dbMin / ppc) : dbMin)
+        : ''
     }
     setColorStocks(stocks)
     setColorStocksCajas(cajas)
@@ -103,6 +106,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     setColorError('')
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const ppc = parseInt(form.piezas_por_caja) || 0
     const stockMin = parseInt(nuevoMinGen) || parseInt(form.stock_minimo) || 5
     let stockActual = producto.stock_fisico
 
@@ -115,9 +119,10 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
         .insert({ producto_id: producto.id, nombre, hex: info.hex, stock: nuevoStockGen })
         .select().single()
       if (err || !data) continue
-      // stock_minimo en UPDATE separado — resiliente si la migración aún no se corrió
-      if (stockMin) {
-        await supabase.from('producto_colores').update({ stock_minimo: stockMin }).eq('id', data.id)
+      // stock_minimo en UPDATE separado — convertido a piezas igual que stock
+      const minPiezas = ppc > 0 ? stockMin * ppc : stockMin
+      if (minPiezas) {
+        await supabase.from('producto_colores').update({ stock_minimo: minPiezas }).eq('id', data.id)
       }
       if (nuevoStockGen > 0) {
         const stockDespues = stockActual + nuevoStockGen
@@ -239,10 +244,12 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       await supabase.from('productos').update({ stock_fisico: nuevoStockFisico }).eq('id', producto.id)
     }
 
-    // ── Cambios de stock_minimo por color ─────────────────────
+    // ── Cambios de stock_minimo por color (colorMins en cajas, DB en piezas)
+    const ppc2 = parseInt(form.piezas_por_caja) || 0
     for (const c of colores) {
-      const newMin  = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) || 0 : null
-      const oldMin  = c.stock_minimo !== undefined && c.stock_minimo !== null ? c.stock_minimo : null
+      const cajasUI = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) : null
+      const newMin  = cajasUI !== null ? (ppc2 > 0 ? cajasUI * ppc2 : cajasUI) : null
+      const oldMin  = c.stock_minimo ?? null
       if (newMin !== oldMin) {
         await supabase.from('producto_colores').update({ stock_minimo: newMin }).eq('id', c.id)
       }
@@ -507,15 +514,23 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                         </div>
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">
-                            Stock mínimo <span className="text-slate-300">(def. {producto.stock_minimo})</span>
+                            Mín. {ppc ? `(${producto.unidad})` : <span className="text-slate-300">(def. {producto.stock_minimo})</span>}
                           </label>
                           <input
                             type="number" min="0"
                             value={colorMins[c.id] ?? ''}
                             onChange={e => setColorMins(prev => ({ ...prev, [c.id]: e.target.value }))}
-                            placeholder={String(producto.stock_minimo)}
+                            placeholder={ppc
+                              ? String(Math.round(producto.stock_minimo / ppc))
+                              : String(producto.stock_minimo)
+                            }
                             className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
                           />
+                          {ppc && (colorMins[c.id] ?? '') !== '' && parseInt(colorMins[c.id] ?? '0') > 0 && (
+                            <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                              = {formatNum(parseInt(colorMins[c.id] ?? '0') * ppc)} pzas
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
