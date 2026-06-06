@@ -190,9 +190,9 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           >
             {/* Logo tipográfico */}
             <div style={{ textAlign: 'center', borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '5px 0', marginBottom: '5px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '5px', margin: 0 }}>PAPELERÍA</p>
-              <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
-              <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
+              <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: 0 }}>PAPELERÍA</p>
+              <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
+              <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.3, marginBottom: '2px' }}>
               Calle Mesones 123, 2º piso (mano izquierda)<br />
