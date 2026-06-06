@@ -29,15 +29,11 @@ interface Props {
 type Tab = 'imprimir' | 'correo' | 'telefono'
 
 // ── Print CSS para el documento del popup.
-// @page size: 58mm auto → ancho fijo de rollo térmico, alto determinado
-// por el contenido (no hay saltos de página artificiales).
-// height: auto en html/body evita el espacio en blanco que aparece cuando
-// el popup window tiene una altura fija y el browser lo rellena con vacío.
+// NO usamos @page { size } aquí — lo inyectamos dinámicamente en onload
+// una vez que el contenido ya renderizó y sabemos su altura real.
+// Esto garantiza exactamente 1 página en el preview, sin espacios en blanco.
 const PRINT_CSS = `
-  @page {
-    size: 58mm auto;
-    margin: 0;
-  }
+  @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     height: auto !important;
@@ -86,9 +82,11 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Print — popup con script propio. Imprime en window.onload y cierra
-  //    en window.onafterprint. Sin height fijo para que el browser no
-  //    rellene con espacio en blanco hasta el alto del popup.
+  // ── Print — popup con script propio.
+  //    En onload: mide scrollHeight del contenido ya renderizado,
+  //    convierte a mm (96 DPI = 25.4/96 mm/px) e inyecta un @page exacto
+  //    → el preview muestra 1 sola hoja del largo del ticket.
+  //    Cierra en onafterprint para no truncar el spool.
   function handlePrint(): void {
     const content = ticketRef.current?.innerHTML ?? ''
     const win = window.open('', '_blank', 'width=300')
@@ -96,9 +94,18 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title>` +
       `<style>${PRINT_CSS}</style></head><body>${content}` +
-      `<script>window.onafterprint=function(){window.close()};` +
-      `window.onload=function(){window.focus();window.print();` +
-      `setTimeout(function(){window.close()},30000)};<\/script>` +
+      `<script>` +
+      `window.onload=function(){` +
+        `var h=document.documentElement.scrollHeight;` +
+        `var mm=Math.ceil(h*25.4/96)+10;` +
+        `var s=document.createElement('style');` +
+        `s.innerHTML='@page{size:58mm '+mm+'mm;margin:0;}';` +
+        `document.head.appendChild(s);` +
+        `window.onafterprint=function(){window.close()};` +
+        `window.focus();window.print();` +
+        `setTimeout(function(){window.close()},30000);` +
+      `};` +
+      `<\/script>` +
       `</body></html>`
     )
     win.document.close()
