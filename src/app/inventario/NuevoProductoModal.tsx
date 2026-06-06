@@ -582,12 +582,6 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                   className="w-full h-11 pl-7 pr-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
-              {precioUnitario && form.precio_menudeo && parseFloat(precioUnitario) > 0 && parseFloat(form.precio_menudeo) > 0 && (
-                <p className="text-xs text-green-700 mt-1 font-medium">
-                  Margen estimado:{' '}
-                  {Math.round((1 - parseFloat(precioUnitario) / parseFloat(form.precio_menudeo)) * 100)}%
-                </p>
-              )}
             </div>
           </div>
 

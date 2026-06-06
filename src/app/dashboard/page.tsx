@@ -145,18 +145,25 @@ export default async function DashboardPage() {
   }
 
   // ── Margen estimado por producto ─────────────────────────────
-  // Toma el último precio_unitario conocido de cada producto y lo
-  // compara contra precio_menudeo para calcular el margen bruto.
-  type MargenItem = { nombre: string; costoUnit: number; precioVenta: number; margen: number; proveedor: string | null; unidad: string }
+  // precio_unitario = costo por unidad del producto (caja si ppc>0, pieza si no).
+  // Para comparar correctamente, usamos el precio de venta de la MISMA unidad.
+  type MargenItem = { nombre: string; costoUnit: number; precioVenta: number; margen: number; proveedor: string | null; unidad: string; etiqueta: string }
   const margenMap = new Map<string, MargenItem>()
   for (const e of (entradasConCosto ?? []) as any[]) {
-    if (margenMap.has(e.producto_id)) continue  // ya tenemos el más reciente
+    if (margenMap.has(e.producto_id)) continue
     const prod = e.productos
     if (!prod) continue
     const ppc      = prod.piezas_por_caja ?? 0
-    const costoUnit = Number(e.precio_unitario)             // precio por unidad del producto (caja o pza)
-    const ventaUnit  = Number(prod.precio_menudeo)          // precio de venta por unidad
-    const margen = ventaUnit > 0 ? Math.round((1 - costoUnit / ventaUnit) * 100) : 0
+    const costoUnit = Number(e.precio_unitario)
+    // Precio de venta en la misma unidad que el costo:
+    // - Si tiene precio_caja y ppc > 0 → comparar caja vs caja
+    // - Si tiene ppc pero no precio_caja → ppc × precio_menudeo = precio implícito por caja
+    // - Sin ppc → comparar pieza vs pieza
+    const ventaUnit = ppc > 0
+      ? (prod.precio_caja ? Number(prod.precio_caja) : ppc * Number(prod.precio_menudeo))
+      : Number(prod.precio_menudeo)
+    const etiqueta  = ppc > 0 ? 'por caja' : `por ${prod.unidad}`
+    const margen    = ventaUnit > 0 ? Math.round((1 - costoUnit / ventaUnit) * 100) : 0
     margenMap.set(e.producto_id, {
       nombre:      prod.nombre,
       costoUnit,
@@ -164,6 +171,7 @@ export default async function DashboardPage() {
       margen,
       proveedor:   e.proveedores?.nombre ?? null,
       unidad:      prod.unidad,
+      etiqueta,
     })
   }
   const margenItems = [...margenMap.values()].sort((a, b) => b.margen - a.margen)
@@ -224,6 +232,30 @@ export default async function DashboardPage() {
   const totalAdeudado   = (adeudosPendientes ?? []).reduce((s, a) => s + Math.max(0, Number(a.monto) - Number((a as any).monto_pagado ?? 0)), 0)
   const adeudosVencidos = (adeudosPendientes ?? []).filter(a => diasParaVencer(a.fecha_vencimiento) < 0)
   const adeudosUrgentes = (adeudosPendientes ?? []).filter(a => { const d = diasParaVencer(a.fecha_vencimiento); return d >= 0 && d <= 3 })
+
+  // ── Score de Salud Financiera (0–100) ────────────────────────
+  const productosVerde = totalActivos - productosAlerta.length
+  const stockScore  = totalActivos > 0 ? Math.round((productosVerde / totalActivos) * 35) : 35
+  const deudaScore  = adeudosVencidos.length === 0 ? 25 : Math.max(0, 25 - adeudosVencidos.length * 8)
+  const tendScore   = deltaIngresos === null ? 10
+    : Math.max(0, Math.min(20, Math.round(10 + deltaIngresos * 0.3)))
+  const margenScore = totalActivos > 0 ? Math.min(20, Math.round((margenItems.length / totalActivos) * 20)) : 0
+  const saludScore  = Math.min(100, stockScore + deudaScore + tendScore + margenScore)
+  const saludLabel  = saludScore >= 70 ? 'Salud Buena' : saludScore >= 40 ? 'Salud Regular' : 'Atención Requerida'
+  const saludColor  = saludScore >= 70 ? 'text-green-600' : saludScore >= 40 ? 'text-amber-600' : 'text-red-600'
+  const saludMsg    = (() => {
+    const parts: string[] = []
+    if (margenItems.length === 0)         parts.push('registra precios de compra')
+    if ((costosFijos?.length ?? 0) === 0) parts.push('agrega costos fijos')
+    if (adeudosVencidos.length > 0)       parts.push(`${adeudosVencidos.length} adeudo${adeudosVencidos.length > 1 ? 's' : ''} vencido${adeudosVencidos.length > 1 ? 's' : ''}`)
+    return parts.length === 0 ? 'Todos los módulos conectados ✓' : parts.join(' · ')
+  })()
+  const needleAngle = (1 - saludScore / 100) * Math.PI
+  const needleX     = +(60 + 37 * Math.cos(needleAngle)).toFixed(1)
+  const needleY     = +(65 - 37 * Math.sin(needleAngle)).toFixed(1)
+  const arcX        = +(60 + 44 * Math.cos(needleAngle)).toFixed(1)
+  const arcY        = +(65 - 44 * Math.sin(needleAngle)).toFixed(1)
+  const arcLarge    = saludScore >= 50 ? 1 : 0
 
   // ── Costos donut ──────────────────────────────────────────
   const costoMercancia = (comprasMes ?? []).reduce((s: number, r: any) => {
@@ -503,51 +535,86 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* Financial health score (placeholder) */}
+          {/* Financial health score — datos reales */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-700">Salud Financiera</p>
             </div>
             <div className="flex flex-col items-center px-5 pt-4 pb-2">
-              {/* Gauge SVG */}
               <svg viewBox="0 0 120 70" width="160">
+                {/* Pista completa */}
                 <path d="M15 65 A45 45 0 0 1 105 65" fill="none" stroke="#f1f5f9" strokeWidth="10" strokeLinecap="round" />
-                <path d="M15 65 A45 45 0 0 1 87 26"  fill="none" stroke="#7c3aed" strokeWidth="10" strokeLinecap="round" />
-                <line x1="60" y1="65" x2="52" y2="28" stroke="#1e293b" strokeWidth="2" strokeLinecap="round" />
+                {/* Arco de score */}
+                {saludScore > 0 && saludScore < 100 && (
+                  <path
+                    d={`M15 65 A45 45 0 ${arcLarge} 1 ${arcX} ${arcY}`}
+                    fill="none"
+                    stroke={saludScore >= 70 ? '#22c55e' : saludScore >= 40 ? '#f59e0b' : '#ef4444'}
+                    strokeWidth="10" strokeLinecap="round"
+                  />
+                )}
+                {saludScore === 100 && (
+                  <path d="M15 65 A45 45 0 0 1 105 65" fill="none" stroke="#22c55e" strokeWidth="10" strokeLinecap="round" />
+                )}
+                {/* Aguja */}
+                <line x1="60" y1="65" x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth="2" strokeLinecap="round" />
                 <circle cx="60" cy="65" r="5" fill="#fff" stroke="#1e293b" strokeWidth="1.5" />
                 <text x="10"  y="72" fill="#94a3b8" fontSize="8" fontFamily="monospace">0</text>
                 <text x="55"  y="18" fill="#94a3b8" fontSize="8" fontFamily="monospace">50</text>
                 <text x="102" y="72" fill="#94a3b8" fontSize="8" fontFamily="monospace">100</text>
               </svg>
-              <p className="text-4xl font-bold text-violet-600 -mt-1">72</p>
-              <p className="text-xs font-semibold text-green-600 mt-0.5">Salud Buena</p>
-              <p className="text-[11px] text-slate-400 text-center mt-1 max-w-[160px]">
-                Liquidez estable · Stock saludable · Conecta proveedores para score completo
-              </p>
+              <p className={`text-4xl font-bold -mt-1 ${saludColor}`}>{saludScore}</p>
+              <p className={`text-xs font-semibold mt-0.5 ${saludColor}`}>{saludLabel}</p>
             </div>
             <div className="border-t border-slate-100">
               {[
-                { label: 'Productos activos',  value: `${totalActivos}`, color: 'text-violet-600', points: [18,15,10,12,6,4] },
-                { label: 'En stock crítico',    value: `${productosAlerta.length} / ${totalActivos}`, color: productosAlerta.length > 0 ? 'text-amber-600' : 'text-green-600', points: [6,10,8,14,10,12] },
-                { label: 'Ingresos 7D',         value: formatMXN(ingresosSemana), color: 'text-blue-600', points: [10,12,14,16,14,15] },
-              ].map(({ label, value, color, points }) => (
+                {
+                  label: 'Stock saludable',
+                  value: `${productosVerde} / ${totalActivos}`,
+                  score: stockScore,
+                  max: 35,
+                  color: stockScore >= 28 ? 'text-green-600' : stockScore >= 14 ? 'text-amber-600' : 'text-red-500',
+                },
+                {
+                  label: 'Sin adeudos vencidos',
+                  value: adeudosVencidos.length === 0 ? '✓ Al día' : `${adeudosVencidos.length} vencido${adeudosVencidos.length > 1 ? 's' : ''}`,
+                  score: deudaScore,
+                  max: 25,
+                  color: deudaScore === 25 ? 'text-green-600' : deudaScore >= 12 ? 'text-amber-600' : 'text-red-500',
+                },
+                {
+                  label: 'Tendencia ingresos',
+                  value: deltaIngresos !== null ? `${deltaIngresos >= 0 ? '+' : ''}${deltaIngresos.toFixed(1)}% 7d` : 'Sin datos aún',
+                  score: tendScore,
+                  max: 20,
+                  color: tendScore >= 15 ? 'text-green-600' : 'text-amber-600',
+                },
+                {
+                  label: 'Márgenes conocidos',
+                  value: `${margenItems.length} / ${totalActivos} productos`,
+                  score: margenScore,
+                  max: 20,
+                  color: margenScore >= 15 ? 'text-green-600' : margenScore >= 8 ? 'text-amber-600' : 'text-red-500',
+                },
+              ].map(({ label, value, score, max, color }) => (
                 <div key={label} className="flex items-center justify-between px-5 py-2.5 border-b border-slate-50">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-[11px] text-slate-500">{label}</p>
                     <p className={`text-sm font-bold ${color}`}>{value}</p>
                   </div>
-                  <svg viewBox="0 0 60 24" width="56" height="24">
-                    <polyline
-                      points={points.map((y, x) => `${x * 12},${24 - y}`).join(' ')}
-                      fill="none" stroke={color.replace('text-', '').includes('violet') ? '#7c3aed' : color.includes('amber') ? '#f59e0b' : '#3b82f6'}
-                      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                  </svg>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-current" style={{ width: `${Math.round(score/max*100)}%`, color: color.replace('text-', '') === 'green-600' ? '#22c55e' : color.includes('amber') ? '#f59e0b' : '#ef4444' }} />
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums ${color}`}>{score}/{max}</span>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="px-4 py-2 bg-violet-50 border-t border-violet-100">
-              <span className="text-[10px] text-violet-500 font-medium">Score parcial · mejora al conectar proveedores y costos</span>
+            <div className={`px-4 py-2 border-t ${saludMsg.includes('✓') ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'}`}>
+              <span className={`text-[10px] font-medium ${saludMsg.includes('✓') ? 'text-green-700' : 'text-amber-700'}`}>
+                {saludMsg}
+              </span>
             </div>
           </div>
 
@@ -695,7 +762,7 @@ export default async function DashboardPage() {
                       <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-2.5">
                           <p className="text-xs font-semibold text-slate-800 truncate max-w-[180px]">{item.nombre}</p>
-                          <p className="text-[10px] text-slate-400">por {item.unidad}</p>
+                          <p className="text-[10px] text-slate-400">{item.etiqueta}</p>
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs text-slate-600 tabular-nums">
                           {formatMXNFull(item.costoUnit)}
