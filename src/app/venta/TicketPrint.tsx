@@ -105,16 +105,18 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   }
 
   // ── Paso 3 — div con bordes, fuente 10px sin letter-spacing ──
-  // Si pasa: los bordes no son el problema → la causa eran fonts/spacing.
-  // Si falla: el div con border-top/bottom rompe el layout de impresion.
+  // border-top/bottom en un div provoca salto de pagina en Chrome print.
+  // Fix: reemplazar con div background:#000 height:2px (sin propiedad border).
   function handlePaso3(): void {
     openPrint(
-      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:4px 0">' +
+      '<div style="background:#000;height:2px"></div>' +
+      '<div style="text-align:center;padding:4px 0">' +
       '<p>PAPELERIA</p>' +
       '<p>LA MAS BARATERA</p>' +
       '</div>' +
+      '<div style="background:#000;height:2px"></div>' +
       '<p>lamasbaratera.com.mx</p>' +
-      '<p>PRUEBA 3 - div con bordes, fuente base</p>'
+      '<p>PRUEBA 3 - lineas con background (sin border CSS)</p>'
     )
   }
 
@@ -187,10 +189,14 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
             {/* Logo tipográfico */}
-            <div style={{ textAlign: 'center', borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '5px 0', marginBottom: '5px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: 0 }}>PAPELERÍA</p>
-              <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
-              <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
+            <div style={{ marginBottom: '5px' }}>
+              <div style={{ background: '#000', height: '2px' }} />
+              <div style={{ textAlign: 'center', padding: '5px 0' }}>
+                <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: 0 }}>PAPELERÍA</p>
+                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
+                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
+              </div>
+              <div style={{ background: '#000', height: '2px' }} />
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.3, marginBottom: '2px' }}>
               Calle Mesones 123, 2º piso (mano izquierda)<br />
