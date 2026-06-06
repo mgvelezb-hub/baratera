@@ -50,9 +50,30 @@ function Row({ children, style }: { children: React.ReactNode; style?: React.CSS
 }
 
 function Divider() {
-  return (
-    <div style={{ borderTop: '1px dashed #555', margin: '5px 0' }} />
+  return <div style={{ borderTop: '1px dashed #555', margin: '5px 0' }} />
+}
+
+// ── Shared print helper ──────────────────────────────────────────
+// 80ms delay gives Chrome a layout frame before print() is called.
+// 1500ms delay on close gives the ZKTeco time to receive full data
+// (onafterprint fires when Chrome submits to spooler, not on paper end).
+function openPrint(bodyHtml: string, css = PRINT_CSS): void {
+  const win = window.open('', '_blank', 'width=380,height=500')
+  if (!win) return
+  win.document.write(
+    '<!DOCTYPE html><html><head>' +
+    '<meta charset="utf-8"><title>Ticket</title>' +
+    '<style>' + css + '</style>' +
+    '</head><body>' + bodyHtml + '</body></html>'
   )
+  win.document.close()
+  win.onafterprint = () => setTimeout(() => win.close(), 1500)
+  const go = () => { win.focus(); win.print() }
+  if (win.document.readyState === 'complete') {
+    setTimeout(go, 80)
+  } else {
+    win.addEventListener('load', () => setTimeout(go, 80), { once: true })
+  }
 }
 
 export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta }: Props) {
@@ -64,34 +85,54 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   const [emailError,   setEmailError]   = useState('')
 
   const metodoLabel =
-    payment.metodo === 'efectivo'      ? 'Efectivo'
-    : payment.metodo === 'tarjeta'     ? 'Tarjeta'
+    payment.metodo === 'efectivo'        ? 'Efectivo'
+    : payment.metodo === 'tarjeta'       ? 'Tarjeta'
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
+  // ── Paso 1 — texto mínimo, CSS mínimo ───────────────────────
+  // Verifica que el popup abre y la impresora recibe algo.
+  function handlePaso1(): void {
+    openPrint(
+      '<p>PRUEBA 1</p><p>Popup y ZKTeco conectan.</p>',
+      '@page{margin:0}body{font-family:monospace;font-size:14px;padding:4px}'
+    )
+  }
+
+  // ── Paso 2 — encabezado con PRINT_CSS (width: 58mm activo) ──
+  function handlePaso2(): void {
+    openPrint(
+      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px">' +
+      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px">PAPELERÍA</p>' +
+      '<p style="font-size:22px;font-weight:bold;line-height:1.05">LA MÁS BARATERA</p>' +
+      '</div>' +
+      '<p style="text-align:center;font-size:11px">lamasbaratera.com.mx</p>' +
+      '<p style="text-align:center;font-size:12px">PRUEBA 2 - encabezado</p>'
+    )
+  }
+
+  // ── Paso 3 — items como texto plano, sin display:flex ───────
+  function handlePaso3(): void {
+    const lines = items.map(item => {
+      const parts: string[] = []
+      if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja(s)`)
+      if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} pza(s)`)
+      return `<p>${item.nombre} ${parts.join(' + ')} - ${formatMXN(item.subtotal)}</p>`
+    })
+    openPrint(
+      '<p>PRUEBA 3 - items sin diseno</p>' +
+      '<hr style="margin:4px 0">' +
+      lines.join('') +
+      '<hr style="margin:4px 0">' +
+      `<p>TOTAL: ${formatMXN(total)}</p>`
+    )
+  }
+
+  // ── Paso 4 / handlePrint — ticket completo con diseño ───────
   function handlePrint(): void {
     const node = ticketRef.current
     if (!node) return
-    const win = window.open('', '_blank', 'width=380,height=500')
-    if (!win) return
-    win.document.write(
-      '<!DOCTYPE html><html><head>' +
-      '<meta charset="utf-8"><title>Ticket</title>' +
-      '<style>' + PRINT_CSS + '</style>' +
-      '</head><body>' + node.innerHTML +
-      '</body></html>'
-    )
-    win.document.close()
-    // Delay close so the ZKTeco printer has time to fully receive the data
-    // before the popup is destroyed (onafterprint fires when Chrome submits
-    // the job to the spooler, not when the paper finishes printing).
-    win.onafterprint = () => setTimeout(() => win.close(), 1500)
-    if (win.document.readyState === 'complete') {
-      win.focus()
-      win.print()
-    } else {
-      win.addEventListener('load', () => { win.focus(); win.print() }, { once: true })
-    }
+    openPrint(node.innerHTML)
   }
 
   // ── Email via Resend API ─────────────────────────────────────
@@ -130,6 +171,13 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     { id: 'correo',   label: 'Correo',   Icon: Mail    },
   ] as const
 
+  const PASOS = [
+    { label: 'Paso 1', title: 'Texto mínimo',      fn: handlePaso1 },
+    { label: 'Paso 2', title: 'Encabezado',         fn: handlePaso2 },
+    { label: 'Paso 3', title: 'Items sin diseño',   fn: handlePaso3 },
+    { label: 'Paso 4', title: 'Ticket completo',    fn: handlePrint },
+  ]
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
@@ -142,13 +190,13 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           </button>
         </div>
 
-        {/* ── Ticket preview (innerHTML is captured for print) ── */}
+        {/* ── Ticket preview (innerHTML captured for print) ── */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* ── Logo tipográfico ── */}
+            {/* Logo tipográfico */}
             <div style={{ textAlign: 'center', borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '5px 0', marginBottom: '5px' }}>
               <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '5px', margin: 0 }}>PAPELERÍA</p>
               <p style={{ fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
@@ -163,12 +211,11 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
             <Divider />
 
-            {/* ── Items — ancho completo, precio al borde derecho ── */}
+            {/* Items */}
             {items.map((item, i) => {
               const parts: string[] = []
               if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
               if (item.cantidadPiezas > 0) {
-                // 'pza' cuando la unidad es 'caja' (con o sin cajas en el ítem)
                 const uPzas = (item.cantidadCajas > 0 || item.unidad === 'caja') ? 'pza' : item.unidad
                 parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
               }
@@ -186,7 +233,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
             <Divider />
 
-            {/* ── Total ── */}
+            {/* Total */}
             <Row style={{ fontSize: '20px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
               <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
@@ -194,7 +241,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
             <Divider />
 
-            {/* ── Desglose de pago ── */}
+            {/* Desglose de pago */}
             <Row style={{ fontSize: '13px' }}>
               <span>Forma de pago</span>
               <span style={{ whiteSpace: 'nowrap' }}>{metodoLabel}</span>
@@ -253,13 +300,32 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
           {/* Imprimir */}
           {tab === 'imprimir' && (
-            <button
-              onClick={handlePrint}
-              className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Imprimir ticket
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handlePrint}
+                className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir ticket
+              </button>
+
+              {/* Diagnóstico paso a paso */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-400 text-center">— diagnóstico —</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {PASOS.map(({ label, title, fn }) => (
+                    <button
+                      key={label}
+                      onClick={fn}
+                      title={title}
+                      className="h-9 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Correo */}
