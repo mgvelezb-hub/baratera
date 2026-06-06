@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/AppShell'
 import SalesChart from './SalesChart'
 import type { ChartDay } from './SalesChart'
@@ -6,7 +7,7 @@ import { calcularSemaforo, calcularSemaforoEfectivo, costoMensual, CATEGORIA_MET
 import type { CostoFijo, CostoCategoria, ProductoColor } from '@/lib/types'
 import {
   TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight,
-  ShoppingCart, Zap, Monitor, Globe, RefreshCcw,
+  ShoppingCart, Zap, Monitor, Globe, RefreshCcw, Receipt,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -18,6 +19,17 @@ const TIPO_META: Record<string, { label: string; color: string }> = {
   ajuste_negativo:          { label: 'Ajuste (−)',    color: 'text-amber-600 bg-amber-50'  },
   devolucion:               { label: 'Devolución',    color: 'text-purple-600 bg-purple-50'},
   levantamiento_inventario: { label: 'Inventario',   color: 'text-slate-600 bg-slate-100' },
+}
+
+function formatCorteDate(iso: string, now: Date): string {
+  const d       = new Date(iso)
+  const todayStr = now.toISOString().split('T')[0]
+  const yestStr  = new Date(now.getTime() - 86_400_000).toISOString().split('T')[0]
+  const dStr     = iso.split('T')[0]
+  const hora     = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  if (dStr === todayStr) return `Hoy ${hora}`
+  if (dStr === yestStr)  return `Ayer ${hora}`
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) + ` ${hora}`
 }
 
 function tiempoRelativo(dateStr: string): string {
@@ -74,6 +86,7 @@ export default async function DashboardPage() {
     { data: costosFijos },
     { data: comprasMes },
     { data: ledgerSemana },
+    { data: cortesDB },
   ] = await Promise.all([
     supabase.from('ventas').select('total').gte('created_at', todayStart),
     supabase.from('stock_ledger').select('id')
@@ -99,6 +112,10 @@ export default async function DashboardPage() {
     supabase.from('stock_ledger')
       .select('qty_antes, qty_despues, productos(nombre, precio_menudeo, unidad, stock_minimo)')
       .eq('tipo', 'salida_venta_manual').gte('created_at', sevenAgo),
+    supabase.from('cortes_caja')
+      .select('id, cajero_id, total_ventas, total_efectivo, total_tarjeta, total_transferencia, diferencia, num_transacciones, notas, created_at')
+      .order('created_at', { ascending: false })
+      .limit(8),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
@@ -119,6 +136,15 @@ export default async function DashboardPage() {
     arr.push(c)
     coloresMapDB.set(c.producto_id, arr)
   }
+
+  // Mapa cajero_id → nombre (parte local del email)
+  const cajeroMap = new Map<string, string>()
+  try {
+    const { data: { users } } = await createAdminClient().auth.admin.listUsers({ perPage: 100 })
+    for (const u of users) {
+      cajeroMap.set(u.id, (u.email ?? u.id).split('@')[0])
+    }
+  } catch (_) { /* service role no disponible — se mostrará id truncado */ }
 
   const productosAlerta  = (productos ?? []).filter(p =>
     calcularSemaforoEfectivo(p, coloresMapDB.get(p.id) ?? []) !== 'verde'
@@ -599,6 +625,95 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* ── Cortes de caja ────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <div>
+              <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Receipt className="w-3.5 h-3.5 text-violet-500" />
+                Cortes de caja
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {(cortesDB ?? []).length} corte{(cortesDB ?? []).length !== 1 ? 's' : ''} recientes
+              </p>
+            </div>
+            <Link href="/corte" className="text-xs text-violet-600 font-medium hover:underline">
+              Nuevo corte →
+            </Link>
+          </div>
+          {!cortesDB || cortesDB.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center px-6">
+              <Receipt className="w-8 h-8 text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">Sin cortes registrados aún</p>
+              <Link href="/corte" className="mt-2 text-xs text-violet-600 font-semibold hover:underline">
+                Hacer primer corte →
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Fecha / Hora</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">Cajero</th>
+                    <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ventas</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Efectivo</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400">Diferencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(cortesDB ?? []).map((c: any) => {
+                    const dif      = Number(c.diferencia)
+                    const difColor = dif === 0       ? 'text-green-600'
+                      : Math.abs(dif) <= 50          ? 'text-amber-600'
+                      : dif > 0                      ? 'text-blue-600'
+                      : 'text-red-600'
+                    const difLabel = dif === 0
+                      ? '✓ Cuadra'
+                      : dif > 0 ? `+${formatMXNFull(dif)}` : formatMXNFull(dif)
+                    const cajero   = c.cajero_id
+                      ? (cajeroMap.get(c.cajero_id) ?? c.cajero_id.slice(0, 8))
+                      : '—'
+                    return (
+                      <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                          {formatCorteDate(c.created_at, now)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                            {cajero}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="text-xs font-medium text-slate-700">
+                            {c.num_transacciones}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-slate-500 tabular-nums whitespace-nowrap">
+                          {formatMXNFull(Number(c.total_efectivo))}
+                          {Number(c.total_tarjeta) > 0 && (
+                            <span className="ml-1 text-blue-500">+{formatMXN(Number(c.total_tarjeta))}</span>
+                          )}
+                          {Number(c.total_transferencia) > 0 && (
+                            <span className="ml-1 text-violet-500">+{formatMXN(Number(c.total_transferencia))}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                          {formatMXNFull(Number(c.total_ventas))}
+                        </td>
+                        <td className={`px-4 py-2.5 text-right text-xs font-semibold tabular-nums whitespace-nowrap ${difColor}`}>
+                          {difLabel}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* ── Activity log ──────────────────────────────────── */}
