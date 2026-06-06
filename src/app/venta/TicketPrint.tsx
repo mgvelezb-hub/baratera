@@ -35,7 +35,6 @@ const PRINT_CSS = `
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     line-height: 1.3;
-    width: 58mm;
     padding: 2mm;
     color: #000;
   }
@@ -90,41 +89,32 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // ── Paso 1 — texto mínimo, CSS mínimo ───────────────────────
-  // Verifica que el popup abre y la impresora recibe algo.
+  // ── Paso 1 — texto mínimo, CSS mínimo (sin PRINT_CSS) ───────
+  // Confirma que popup + ZKTeco básico funcionan.
   function handlePaso1(): void {
     openPrint(
-      '<p>PRUEBA 1</p><p>Popup y ZKTeco conectan.</p>',
+      '<p>PRUEBA 1 — texto simple</p><p>ZKTeco conecta OK.</p>',
       '@page{margin:0}body{font-family:monospace;font-size:14px;padding:4px}'
     )
   }
 
-  // ── Paso 2 — encabezado con PRINT_CSS (width: 58mm activo) ──
+  // ── Paso 2 — MISMO texto que Paso 1, CON PRINT_CSS (sin width) ──
+  // Si pasa: quitar width:58mm fue el fix correcto.
+  // Si falla: otro elemento del PRINT_CSS es el problema.
   function handlePaso2(): void {
+    openPrint('<p>PRUEBA 2 — texto simple con PRINT_CSS</p><p>ZKTeco conecta OK.</p>')
+  }
+
+  // ── Paso 3 — encabezado con PRINT_CSS ───────────────────────
+  // Si pasa: el CSS ya está bien, el problema era solo width:58mm.
+  function handlePaso3(): void {
     openPrint(
       '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px">' +
       '<p style="font-size:11px;font-weight:bold;letter-spacing:5px">PAPELERÍA</p>' +
       '<p style="font-size:22px;font-weight:bold;line-height:1.05">LA MÁS BARATERA</p>' +
       '</div>' +
       '<p style="text-align:center;font-size:11px">lamasbaratera.com.mx</p>' +
-      '<p style="text-align:center;font-size:12px">PRUEBA 2 - encabezado</p>'
-    )
-  }
-
-  // ── Paso 3 — items como texto plano, sin display:flex ───────
-  function handlePaso3(): void {
-    const lines = items.map(item => {
-      const parts: string[] = []
-      if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} caja(s)`)
-      if (item.cantidadPiezas > 0) parts.push(`${item.cantidadPiezas} pza(s)`)
-      return `<p>${item.nombre} ${parts.join(' + ')} - ${formatMXN(item.subtotal)}</p>`
-    })
-    openPrint(
-      '<p>PRUEBA 3 - items sin diseno</p>' +
-      '<hr style="margin:4px 0">' +
-      lines.join('') +
-      '<hr style="margin:4px 0">' +
-      `<p>TOTAL: ${formatMXN(total)}</p>`
+      '<p style="text-align:center;font-size:12px">PRUEBA 3 - encabezado</p>'
     )
   }
 
@@ -172,10 +162,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   ] as const
 
   const PASOS = [
-    { label: 'Paso 1', title: 'Texto mínimo',      fn: handlePaso1 },
-    { label: 'Paso 2', title: 'Encabezado',         fn: handlePaso2 },
-    { label: 'Paso 3', title: 'Items sin diseño',   fn: handlePaso3 },
-    { label: 'Paso 4', title: 'Ticket completo',    fn: handlePrint },
+    { label: 'Paso 1', title: 'Texto sin PRINT_CSS',        fn: handlePaso1 },
+    { label: 'Paso 2', title: 'Texto con PRINT_CSS',        fn: handlePaso2 },
+    { label: 'Paso 3', title: 'Encabezado con PRINT_CSS',  fn: handlePaso3 },
+    { label: 'Paso 4', title: 'Ticket completo',            fn: handlePrint },
   ]
 
   return (
