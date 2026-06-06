@@ -50,9 +50,8 @@ function subtotalItem(item: CartItem): number {
     }
   }
   if (item.cantidadPiezas > 0) {
-    const esMayoreo = item.cantidadCajas === 0 &&
-      p.precio_mayoreo && p.umbral_mayoreo &&
-      item.cantidadPiezas >= p.umbral_mayoreo
+    // Mayoreo en piezas aplica aunque también haya cajas en el ítem
+    const esMayoreo = p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo
     total += item.cantidadPiezas * (esMayoreo ? Number(p.precio_mayoreo) : Number(p.precio_menudeo))
   }
   return total
@@ -73,33 +72,42 @@ function maxPiezas(item: CartItem): number {
   return stock - item.cantidadCajas * (item.producto.piezas_por_caja ?? 0)
 }
 
-function ahorroItem(item: CartItem): number {
+function ahorroDesglose(item: CartItem): { caja: number; mayoreo: number } {
   const p = item.producto
-  let total = 0
-  // Ahorro por comprar caja vs piezas a precio menudeo
+  let caja = 0, mayoreo = 0
   if (item.cantidadCajas > 0 && p.precio_caja && p.piezas_por_caja) {
-    total += Math.max(0,
+    caja = Math.max(0,
       item.cantidadCajas * p.piezas_por_caja * Number(p.precio_menudeo) -
       item.cantidadCajas * Number(p.precio_caja)
     )
   }
-  // Ahorro por mayoreo vs menudeo (solo piezas sueltas, sin cajas)
-  if (item.cantidadCajas === 0 && p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo) {
-    total += item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
+  // Mayoreo aplica a piezas aunque haya cajas en el ítem
+  if (p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo) {
+    mayoreo = item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
   }
-  return total
+  return { caja, mayoreo }
+}
+
+function ahorroItem(item: CartItem): number {
+  const { caja, mayoreo } = ahorroDesglose(item)
+  return caja + mayoreo
 }
 
 function toTicketItems(items: CartItem[]): TicketItem[] {
-  return items.map(item => ({
-    nombre:         item.producto.nombre,
-    cantidadCajas:  item.cantidadCajas,
-    cantidadPiezas: item.cantidadPiezas,
-    unidad:         item.producto.unidad,
-    subtotal:       subtotalItem(item),
-    colorNombre:    item.colorNombre ?? null,
-    ahorro:         ahorroItem(item),
-  }))
+  return items.map(item => {
+    const { caja, mayoreo } = ahorroDesglose(item)
+    return {
+      nombre:         item.producto.nombre,
+      cantidadCajas:  item.cantidadCajas,
+      cantidadPiezas: item.cantidadPiezas,
+      unidad:         item.producto.unidad,
+      subtotal:       subtotalItem(item),
+      colorNombre:    item.colorNombre ?? null,
+      ahorro:         caja + mayoreo,
+      ahorroCaja:     caja,
+      ahorroMayoreo:  mayoreo,
+    }
+  })
 }
 
 // ── Product card ───────────────────────────────────────────────
@@ -456,11 +464,10 @@ function CartItemRow({
   onSetPiezas: (id: string, valor: number) => void
   onEliminar: (id: string) => void
 }) {
-  const p         = item.producto
-  const tieneCaja = !!p.piezas_por_caja
-  const esMayoreo = item.cantidadCajas === 0 &&
-    p.precio_mayoreo && p.umbral_mayoreo &&
-    item.cantidadPiezas >= p.umbral_mayoreo
+  const p                = item.producto
+  const tieneCaja        = !!p.piezas_por_caja
+  const esMayoreoPiezas  = !!(p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo)
+  const esMayoreo        = !tieneCaja && esMayoreoPiezas
 
   const key = cartKey(item)
 
@@ -508,8 +515,9 @@ function CartItemRow({
               label={p.unidad === 'caja' ? 'pza' : p.unidad}
             />
             {item.cantidadPiezas > 0 && (
-              <span className="text-xs text-slate-500">
-                {formatMXN(item.cantidadPiezas * Number(p.precio_menudeo))}
+              <span className={`text-xs ${esMayoreoPiezas ? 'text-green-600 font-medium' : 'text-slate-500'}`}>
+                {formatMXN(item.cantidadPiezas * (esMayoreoPiezas ? Number(p.precio_mayoreo!) : Number(p.precio_menudeo)))}
+                {esMayoreoPiezas ? ' · mayoreo' : ''}
               </span>
             )}
           </div>

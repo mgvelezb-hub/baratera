@@ -6,13 +6,15 @@ import { formatMXN, pluralUnidad } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
 
 export interface TicketItem {
-  nombre:         string
-  cantidadCajas:  number
-  cantidadPiezas: number
-  unidad:         string
-  subtotal:       number
-  colorNombre?:   string | null
-  ahorro?:        number
+  nombre:          string
+  cantidadCajas:   number
+  cantidadPiezas:  number
+  unidad:          string
+  subtotal:        number
+  colorNombre?:    string | null
+  ahorro?:         number
+  ahorroCaja?:     number
+  ahorroMayoreo?:  number
 }
 
 interface Props {
@@ -202,9 +204,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               const parts: string[] = []
               if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
               if (item.cantidadPiezas > 0) {
-                // Si el ítem también tiene cajas, las piezas sueltas usan 'pza'
-                // para evitar que dos partes digan "caja" cuando unidad === 'caja'
-                const uPzas = item.cantidadCajas > 0 ? 'pza' : item.unidad
+                // 'pza' cuando la unidad es 'caja' (con o sin cajas en el ítem)
+                const uPzas = (item.cantidadCajas > 0 || item.unidad === 'caja') ? 'pza' : item.unidad
                 parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
               }
               const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' · ')

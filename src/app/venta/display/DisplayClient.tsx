@@ -5,13 +5,15 @@ import { Package, CheckCircle2 } from 'lucide-react'
 import { formatMXN, pluralUnidad } from '@/lib/utils'
 
 export interface DisplayItem {
-  nombre:         string
-  cantidadCajas:  number
-  cantidadPiezas: number
-  unidad:         string
-  subtotal:       number
-  colorNombre?:   string | null
-  ahorro?:        number
+  nombre:          string
+  cantidadCajas:   number
+  cantidadPiezas:  number
+  unidad:          string
+  subtotal:        number
+  colorNombre?:    string | null
+  ahorro?:         number
+  ahorroCaja?:     number
+  ahorroMayoreo?:  number
 }
 
 type DisplayState =
@@ -65,18 +67,26 @@ export default function DisplayClient() {
                 const parts: string[] = []
                 if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
                 if (item.cantidadPiezas > 0) {
-                  const uPzas = item.cantidadCajas > 0 ? 'pza' : item.unidad
+                  // 'pza' cuando la unidad es 'caja' (con o sin cajas en el ítem)
+                  const uPzas = (item.cantidadCajas > 0 || item.unidad === 'caja') ? 'pza' : item.unidad
                   parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
                 }
                 const cantDesc = [parts.join(' + '), item.colorNombre ?? null].filter(Boolean).join(' · ')
+                const ahorroCaja    = item.ahorroCaja    ?? 0
+                const ahorroMayoreo = item.ahorroMayoreo ?? 0
                 return (
                   <tr key={i} className="text-slate-800">
                     <td className="py-4 text-base font-medium">{item.nombre}</td>
                     <td className="py-4 text-center text-slate-500">
                       <span>{cantDesc}</span>
-                      {(item.ahorro ?? 0) > 0 && (
-                        <span className="block text-sm text-green-600 font-semibold mt-0.5">
-                          {item.cantidadCajas > 0 ? 'Precio caja' : 'Mayoreo'} · Ahorras: {formatMXN(item.ahorro!)}
+                      {(ahorroCaja > 0 || ahorroMayoreo > 0) && (
+                        <span className="block text-sm text-green-600 font-semibold mt-0.5 leading-snug">
+                          {ahorroCaja > 0 && (
+                            <span className="block">Precio caja · Ahorras: {formatMXN(ahorroCaja)}</span>
+                          )}
+                          {ahorroMayoreo > 0 && (
+                            <span className="block">Mayoreo · Ahorras: {formatMXN(ahorroMayoreo)}</span>
+                          )}
                         </span>
                       )}
                     </td>
