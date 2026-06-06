@@ -72,7 +72,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       cajas[c.id]  = ppc > 0 ? Math.floor(c.stock / ppc) : c.stock
       const dbMin  = c.stock_minimo
       mins[c.id]   = dbMin !== null && dbMin !== undefined
-        ? String(ppc > 0 ? Math.round(dbMin / ppc) : dbMin)
+        ? String(ppc > 0 ? (dbMin < ppc ? dbMin : Math.round(dbMin / ppc)) : dbMin)
         : ''
     }
     setColorStocks(stocks)
@@ -168,7 +168,12 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     umbral_mayoreo:  producto.umbral_mayoreo  ? String(producto.umbral_mayoreo)  : '',
     precio_caja:     producto.precio_caja    ? String(producto.precio_caja)    : '',
     piezas_por_caja: producto.piezas_por_caja ? String(producto.piezas_por_caja) : '',
-    stock_minimo:    String(producto.stock_minimo),
+    stock_minimo: (() => {
+      const ppc0 = producto.piezas_por_caja ?? 0
+      const v    = producto.stock_minimo
+      // Si el valor guardado es menor que ppc, se asume cajas (bug histórico); si no, convertir de piezas
+      return String(ppc0 > 0 ? (v < ppc0 ? v : Math.round(v / ppc0)) : v)
+    })(),
   })
 
   function set(field: string, value: string) {
@@ -204,7 +209,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
         umbral_mayoreo:  form.umbral_mayoreo  ? parseInt(form.umbral_mayoreo)    : null,
         precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
         piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
-        stock_minimo:    parseInt(form.stock_minimo) || 5,
+        stock_minimo:    ((parseInt(form.stock_minimo) || 5)) * (ppc > 0 ? ppc : 1),
       })
       .eq('id', producto.id)
 
@@ -337,7 +342,9 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Stock mínimo</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Stock mínimo{parseInt(form.piezas_por_caja) > 0 ? ` (${form.unidad})` : ''}
+              </label>
               <input
                 type="number"
                 min="0"
@@ -345,6 +352,11 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                 onChange={e => set('stock_minimo', e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
+              {parseInt(form.piezas_por_caja) > 0 && parseInt(form.stock_minimo) > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  = {formatNum(parseInt(form.stock_minimo) * parseInt(form.piezas_por_caja))} pzas
+                </p>
+              )}
             </div>
           </div>
 
