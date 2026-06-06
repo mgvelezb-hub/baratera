@@ -30,12 +30,11 @@ type Tab = 'imprimir' | 'correo'
 
 const PRINT_CSS = `
   @page { margin: 2mm; size: 58mm auto; }
-  * { margin: 2mm; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
     line-height: 1.3;
-    padding: 1mm;
     color: #000;
   }
 `
@@ -105,18 +104,17 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     openPrint('<p>PRUEBA 2 — texto simple con PRINT_CSS</p><p>ZKTeco conecta OK.</p>')
   }
 
-  // ── Paso 3 — encabezado idéntico al ticket real ─────────────
-  // LA MÁS y BARATERA van en dos <p> separados — una sola línea
-  // de 22px Courier New mide ~56mm y desborda el papel de 54mm útiles.
+  // ── Paso 3 — div con bordes, fuente 10px sin letter-spacing ──
+  // Si pasa: los bordes no son el problema → la causa eran fonts/spacing.
+  // Si falla: el div con border-top/bottom rompe el layout de impresion.
   function handlePaso3(): void {
     openPrint(
-      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;margin-bottom:5px;margin:0">' +
-      '<p style="font-size:11px;font-weight:bold;letter-spacing:5px;margin:0mm">PAPELERÍA</p>' +
-      '<p style="font-size:18px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">LA MÁS</p>' +
-      '<p style="font-size:18px;font-weight:bold;letter-spacing:1px;line-height:1.05;margin:0">BARATERA</p>' +
+      '<div style="text-align:center;border-top:2px solid #000;border-bottom:2px solid #000;padding:4px 0">' +
+      '<p>PAPELERIA</p>' +
+      '<p>LA MAS BARATERA</p>' +
       '</div>' +
-      '<p style="text-align:center;font-size:11px;margin:0">lamasbaratera.com.mx</p>' +
-      '<p style="text-align:center;font-size:12px;margin:0">PRUEBA 3 - encabezado correcto</p>'
+      '<p>lamasbaratera.com.mx</p>' +
+      '<p>PRUEBA 3 - div con bordes, fuente base</p>'
     )
   }
 
