@@ -24,6 +24,9 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
   const [colorActivo,    setColorActivo]    = useState<ProductoColor | null>(null)
 
   const semaforo = calcularSemaforo(producto.stock_fisico, producto.stock_minimo)
+  const semaforoActivo = colorActivo
+    ? calcularSemaforo(colorActivo.stock, colorActivo.stock_minimo ?? producto.stock_minimo)
+    : semaforo
 
   function handleMovimientoSuccess() {
     setModalTipo(null)
@@ -103,8 +106,8 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
           <div className="flex items-end justify-between">
             <div>
               <p className={`text-xl font-bold leading-none ${
-                semaforo === 'rojo' ? 'text-red-600' :
-                semaforo === 'amarillo' ? 'text-amber-600' :
+                semaforoActivo === 'rojo' ? 'text-red-600' :
+                semaforoActivo === 'amarillo' ? 'text-amber-600' :
                 'text-slate-900'
               }`}>
                 {colorActivo

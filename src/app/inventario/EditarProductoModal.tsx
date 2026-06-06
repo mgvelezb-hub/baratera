@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatNum, formatStockConCajas } from '@/lib/utils'
+import { formatNum } from '@/lib/utils'
 
 // Paleta de colores presets
 const COLOR_PALETTE = [
@@ -49,6 +49,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   // Color personalizado (nombre libre)
   const [nuevoColorHex,    setNuevoColorHex]   = useState(COLOR_PALETTE[0].hex)
   const [nuevoColorNombre, setNuevoColorNombre]= useState('')
+  const [colorStocksCajas, setColorStocksCajas] = useState<Record<string, number>>({})
   const [colorLoading,     setColorLoading]    = useState(false)
   const [colorError,       setColorError]      = useState('')
 
@@ -62,13 +63,17 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   }, [producto.id])
 
   useEffect(() => {
+    const ppc    = producto.piezas_por_caja ?? 0
     const stocks: Record<string, number> = {}
+    const cajas:  Record<string, number> = {}
     const mins:   Record<string, string> = {}
     for (const c of colores) {
       stocks[c.id] = c.stock
+      cajas[c.id]  = ppc > 0 ? Math.floor(c.stock / ppc) : c.stock
       mins[c.id]   = c.stock_minimo !== null && c.stock_minimo !== undefined ? String(c.stock_minimo) : ''
     }
     setColorStocks(stocks)
+    setColorStocksCajas(cajas)
     setColorMins(mins)
   }, [colores])
 
@@ -471,17 +476,34 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">
-                            Stock
-                            {ppc && <span className="text-slate-300 ml-1">
-                              ({formatStockConCajas(stockActual, ppc, producto.unidad)})
-                            </span>}
+                            Stock {ppc ? `(${producto.unidad})` : ''}
                           </label>
-                          <input
-                            type="number" min="0"
-                            value={stockActual}
-                            onChange={e => setColorStocks(prev => ({ ...prev, [c.id]: parseInt(e.target.value) || 0 }))}
-                            className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          />
+                          {ppc ? (
+                            <>
+                              <input
+                                type="number" min="0"
+                                value={colorStocksCajas[c.id] ?? 0}
+                                onChange={e => {
+                                  const cajasVal = parseInt(e.target.value) || 0
+                                  setColorStocksCajas(prev => ({ ...prev, [c.id]: cajasVal }))
+                                  setColorStocks(prev => ({ ...prev, [c.id]: cajasVal * ppc }))
+                                }}
+                                className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                              />
+                              {(colorStocksCajas[c.id] ?? 0) > 0 && (
+                                <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                                  = {formatNum((colorStocksCajas[c.id] ?? 0) * ppc)} pzas
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <input
+                              type="number" min="0"
+                              value={stockActual}
+                              onChange={e => setColorStocks(prev => ({ ...prev, [c.id]: parseInt(e.target.value) || 0 }))}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            />
+                          )}
                         </div>
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">
