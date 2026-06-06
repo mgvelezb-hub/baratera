@@ -33,8 +33,9 @@ const PRINT_CSS = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    line-height: 1.3;
+    font-size: 11px;
+    line-height: 1.35;
+    padding: 0 2mm;
     color: #000;
   }
 `
@@ -220,7 +221,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
                 <div key={i} style={{ marginBottom: '5px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
-                    <span style={{ fontSize: '13px', paddingLeft: '6px' }}>{descripcion}</span>
+                    <span>{descripcion}</span>
                     <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>
@@ -230,7 +231,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Total */}
-            <Row style={{ fontSize: '20px', fontWeight: 'bold' }}>
+            <Row style={{ fontSize: '16px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
               <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
             </Row>
@@ -238,38 +239,38 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Desglose de pago */}
-            <Row style={{ fontSize: '13px' }}>
-              <span>Forma de pago</span>
+            <Row>
+              <span>Pago</span>
               <span style={{ whiteSpace: 'nowrap' }}>{metodoLabel}</span>
             </Row>
             {payment.montoEfectivo > 0 && (
-              <Row style={{ fontSize: '13px' }}>
+              <Row>
                 <span>Efectivo</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoEfectivo)}</span>
               </Row>
             )}
             {payment.montoTarjeta > 0 && (
-              <Row style={{ fontSize: '13px' }}>
+              <Row>
                 <span>Tarjeta</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTarjeta)}</span>
               </Row>
             )}
             {payment.montoTransferencia > 0 && (
-              <Row style={{ fontSize: '13px' }}>
+              <Row>
                 <span>Transferencia</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTransferencia)}</span>
               </Row>
             )}
             {payment.cambio > 0 && (
-              <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
+              <Row style={{ fontWeight: 'bold' }}>
                 <span>Cambio</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.cambio)}</span>
               </Row>
             )}
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '14px', fontWeight: 'bold' }}>¡Gracias por su compra!</p>
-            <p style={{ textAlign: 'center', fontSize: '13px' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>Gracias por su compra</p>
+            <p style={{ textAlign: 'center', fontSize: '11px' }}>Vuelva pronto</p>
           </div>
         </div>
 
