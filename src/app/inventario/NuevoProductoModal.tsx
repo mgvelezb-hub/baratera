@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { formatNum, formatStockConCajas } from '@/lib/utils'
 
 const COLOR_PALETTE = [
   { nombre: 'Rojo',      hex: '#ef4444' },
@@ -69,9 +70,10 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Si hay colores, el stock del producto = suma de stocks por color
-    const stockColores  = coloresDraft.reduce((s, c) => s + c.stock, 0)
-    const stockInicial  = coloresDraft.length > 0 ? stockColores : (parseInt(form.stock_fisico) || 0)
+    // Si hay piezas_por_caja, el stock del color se ingresó en esa unidad — convertir a piezas
+    const ppc = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
+    const stockColores = coloresDraft.reduce((s, c) => s + (ppc > 0 ? c.stock * ppc : c.stock), 0)
+    const stockInicial = coloresDraft.length > 0 ? stockColores : (parseInt(form.stock_fisico) || 0)
 
     const { data: producto, error: insertError } = await supabase
       .from('productos')
@@ -99,28 +101,30 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
     }
 
     if (coloresDraft.length > 0) {
-      // Insertar cada color y registrar su stock inicial en el ledger
+      // Insertar cada color; stock_minimo se guarda en UPDATE separado (resiliente a migración pendiente)
       let stockAcum = 0
       for (const c of coloresDraft) {
-        await supabase.from('producto_colores').insert({
-          producto_id:  producto.id,
-          nombre:       c.nombre,
-          hex:          c.hex,
-          stock:        c.stock,
-          stock_minimo: c.stock_minimo > 0 ? c.stock_minimo : null,
-        })
-        if (c.stock > 0) {
+        const stockPiezas = ppc > 0 ? c.stock * ppc : c.stock
+        const { data: colorRow } = await supabase.from('producto_colores')
+          .insert({ producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: stockPiezas })
+          .select().single()
+        // stock_minimo por color — falla silenciosamente si la migración aún no se corrió
+        if (colorRow && c.stock_minimo > 0) {
+          await supabase.from('producto_colores')
+            .update({ stock_minimo: c.stock_minimo }).eq('id', colorRow.id)
+        }
+        if (stockPiezas > 0) {
           await supabase.from('stock_ledger').insert({
             producto_id:    producto.id,
             tipo:           'levantamiento_inventario',
             qty_antes:      stockAcum,
-            qty_despues:    stockAcum + c.stock,
+            qty_despues:    stockAcum + stockPiezas,
             notas:          `Stock inicial — color ${c.nombre}`,
             canal:          'manual',
             usuario_id:     user?.id ?? null,
             color_variante: c.nombre,
           })
-          stockAcum += c.stock
+          stockAcum += stockPiezas
         }
       }
     } else if (stockInicial > 0) {
@@ -272,7 +276,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Stock actual</label>
               {coloresDraft.length > 0 ? (
                 <div className="w-full h-11 px-3 rounded-lg border border-slate-100 bg-slate-50 text-sm flex items-center text-slate-400 gap-1">
-                  {coloresDraft.reduce((s, c) => s + c.stock, 0)}
+                  {coloresDraft.reduce((s, c) => s + c.stock, 0)} {form.piezas_por_caja ? form.unidad : ''}
                   <span className="text-xs">(suma de colores)</span>
                 </div>
               ) : (
@@ -359,7 +363,10 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-slate-500 block mb-1">Stock inicial para todos</label>
+                    <label className="text-xs text-slate-500 block mb-1">
+                      Stock inicial para todos
+                      {form.piezas_por_caja && <span className="text-slate-400 ml-1">({form.unidad})</span>}
+                    </label>
                     <input
                       type="number" min="0"
                       value={generalStock}
@@ -402,47 +409,59 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
             {/* Colores añadidos */}
             {coloresDraft.length > 0 && (
               <div className="space-y-2">
-                {coloresDraft.map((c, i) => (
-                  <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                        <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                {coloresDraft.map((c, i) => {
+                  const ppc         = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
+                  const unidadLabel = ppc > 0 ? form.unidad : 'pzas'
+                  const piezasTotal = ppc > 0 ? c.stock * ppc : c.stock
+                  return (
+                    <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                          <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setColoresDraft(prev => prev.filter((_, j) => j !== i))}
+                          className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setColoresDraft(prev => prev.filter((_, j) => j !== i))}
-                        className="p-1 text-slate-300 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">
+                            Stock inicial <span className="text-slate-300">({unidadLabel})</span>
+                          </label>
+                          <input
+                            type="number" min="0"
+                            value={c.stock}
+                            onChange={e => setColoresDraft(prev => prev.map((x, j) =>
+                              j === i ? { ...x, stock: parseInt(e.target.value) || 0 } : x
+                            ))}
+                            className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                          />
+                          {ppc > 0 && c.stock > 0 && (
+                            <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                              = {formatNum(piezasTotal)} pzas
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Stock mínimo</label>
+                          <input
+                            type="number" min="0"
+                            value={c.stock_minimo}
+                            onChange={e => setColoresDraft(prev => prev.map((x, j) =>
+                              j === i ? { ...x, stock_minimo: parseInt(e.target.value) || 0 } : x
+                            ))}
+                            className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-slate-400 block mb-1">Stock inicial</label>
-                        <input
-                          type="number" min="0"
-                          value={c.stock}
-                          onChange={e => setColoresDraft(prev => prev.map((x, j) =>
-                            j === i ? { ...x, stock: parseInt(e.target.value) || 0 } : x
-                          ))}
-                          className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-slate-400 block mb-1">Stock mínimo</label>
-                        <input
-                          type="number" min="0"
-                          value={c.stock_minimo}
-                          onChange={e => setColoresDraft(prev => prev.map((x, j) =>
-                            j === i ? { ...x, stock_minimo: parseInt(e.target.value) || 0 } : x
-                          ))}
-                          className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

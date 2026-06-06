@@ -107,9 +107,13 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       if (!info) continue
       const { data, error: err } = await supabase
         .from('producto_colores')
-        .insert({ producto_id: producto.id, nombre, hex: info.hex, stock: nuevoStockGen, stock_minimo: stockMin || null })
+        .insert({ producto_id: producto.id, nombre, hex: info.hex, stock: nuevoStockGen })
         .select().single()
       if (err || !data) continue
+      // stock_minimo en UPDATE separado — resiliente si la migración aún no se corrió
+      if (stockMin) {
+        await supabase.from('producto_colores').update({ stock_minimo: stockMin }).eq('id', data.id)
+      }
       if (nuevoStockGen > 0) {
         const stockDespues = stockActual + nuevoStockGen
         await supabase.from('stock_ledger').insert({

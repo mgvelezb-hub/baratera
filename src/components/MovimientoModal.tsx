@@ -9,6 +9,15 @@ import { formatNum, formatStockConCajas } from '@/lib/utils'
 
 interface CantColor { cajas: number; piezas: number }
 
+const COLOR_PALETTE = [
+  { nombre: 'Rojo',     hex: '#ef4444' }, { nombre: 'Naranja',  hex: '#f97316' },
+  { nombre: 'Amarillo', hex: '#eab308' }, { nombre: 'Verde',    hex: '#22c55e' },
+  { nombre: 'Azul',     hex: '#3b82f6' }, { nombre: 'Morado',   hex: '#a855f7' },
+  { nombre: 'Rosa',     hex: '#ec4899' }, { nombre: 'Negro',    hex: '#1e293b' },
+  { nombre: 'Blanco',   hex: '#f8fafc' }, { nombre: 'Gris',     hex: '#94a3b8' },
+  { nombre: 'Café',     hex: '#92400e' }, { nombre: 'Turquesa', hex: '#06b6d4' },
+]
+
 interface Props {
   producto:     Producto
   colores?:     ProductoColor[]
@@ -70,13 +79,20 @@ export default function MovimientoModal({
   const [colorSeleccionado, setColorSeleccionado] = useState('')
 
   // Multi-color entrada
+  const [coloresLocales, setColoresLocales] = useState<ProductoColor[]>(colores)
   const [cantColores, setCantColores] = useState<Record<string, CantColor>>(() =>
     Object.fromEntries(colores.map(c => [c.nombre, { cajas: 0, piezas: 0 }]))
   )
   const [bulkCajas,  setBulkCajas]  = useState(0)
   const [bulkPiezas, setBulkPiezas] = useState(0)
 
-  const tieneColores     = colores.length > 0
+  // Agregar nuevo color desde el modal de entrada
+  const [showNuevoColor,    setShowNuevoColor]    = useState(false)
+  const [nuevoColorNombre,  setNuevoColorNombre]  = useState('')
+  const [nuevoColorHex,     setNuevoColorHex]     = useState(COLOR_PALETTE[0].hex)
+  const [addColorLoading,   setAddColorLoading]   = useState(false)
+
+  const tieneColores     = coloresLocales.length > 0
   const esEntrada        = tipo === 'entrada_compra'
   const esModoMultiColor = esEntrada && tieneColores
   const ppc              = producto.piezas_por_caja ?? 0
@@ -85,7 +101,7 @@ export default function MovimientoModal({
   const cantidadNum      = parseInt(cantidad) || 0
 
   const totalPiezasMulti = esModoMultiColor
-    ? colores.reduce((acc, c) => {
+    ? coloresLocales.reduce((acc, c) => {
         const q = cantColores[c.nombre] ?? { cajas: 0, piezas: 0 }
         return acc + q.cajas * ppc + q.piezas
       }, 0)
@@ -113,7 +129,25 @@ export default function MovimientoModal({
 
   function aplicarATodos() {
     if (bulkCajas === 0 && bulkPiezas === 0) return
-    setCantColores(Object.fromEntries(colores.map(c => [c.nombre, { cajas: bulkCajas, piezas: bulkPiezas }])))
+    setCantColores(Object.fromEntries(coloresLocales.map(c => [c.nombre, { cajas: bulkCajas, piezas: bulkPiezas }])))
+  }
+
+  async function handleAgregarNuevoColor() {
+    if (!nuevoColorNombre.trim()) return
+    if (coloresLocales.some(c => c.nombre.toLowerCase() === nuevoColorNombre.trim().toLowerCase())) return
+    setAddColorLoading(true)
+    const supabase = createClient()
+    const { data, error: err } = await supabase
+      .from('producto_colores')
+      .insert({ producto_id: producto.id, nombre: nuevoColorNombre.trim(), hex: nuevoColorHex, stock: 0 })
+      .select().single()
+    if (!err && data) {
+      setColoresLocales(prev => [...prev, data])
+      setCantColores(prev => ({ ...prev, [data.nombre]: { cajas: 0, piezas: 0 } }))
+      setNuevoColorNombre('')
+      setShowNuevoColor(false)
+    }
+    setAddColorLoading(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -154,7 +188,7 @@ export default function MovimientoModal({
     if (esModoMultiColor) {
       let stockActual = producto.stock_fisico
 
-      for (const color of colores) {
+      for (const color of coloresLocales) {
         const q = cantColores[color.nombre] ?? { cajas: 0, piezas: 0 }
         const piezasColor = q.cajas * ppc + q.piezas
         if (piezasColor === 0) continue
@@ -300,8 +334,8 @@ export default function MovimientoModal({
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   Cantidad por color
                 </p>
-                {colores.map(c => {
-                  const q          = cantColores[c.nombre] ?? { cajas: 0, piezas: 0 }
+                {coloresLocales.map(c => {
+                  const q           = cantColores[c.nombre] ?? { cajas: 0, piezas: 0 }
                   const piezasColor = q.cajas * ppc + q.piezas
                   return (
                     <div
@@ -344,6 +378,60 @@ export default function MovimientoModal({
                     </div>
                   )
                 })}
+
+                {/* ── Agregar nuevo color desde la entrada ── */}
+                {!showNuevoColor ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNuevoColor(true)}
+                    className="w-full h-8 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 hover:border-violet-400 hover:text-violet-600 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar nuevo color
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-violet-700">Nuevo color</p>
+                    <div className="flex flex-wrap gap-1">
+                      {COLOR_PALETTE.map(cp => (
+                        <button
+                          key={cp.hex}
+                          type="button"
+                          onClick={() => setNuevoColorHex(cp.hex)}
+                          className={`w-6 h-6 rounded-full border-2 transition-all ${
+                            nuevoColorHex === cp.hex ? 'border-violet-500 scale-110' : 'border-white shadow-sm'
+                          }`}
+                          style={{ backgroundColor: cp.hex }}
+                          title={cp.nombre}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={nuevoColorNombre}
+                        onChange={e => setNuevoColorNombre(e.target.value)}
+                        placeholder="Nombre del color"
+                        className="flex-1 h-8 px-2 rounded-lg border border-violet-300 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAgregarNuevoColor}
+                        disabled={addColorLoading || !nuevoColorNombre.trim()}
+                        className="h-8 px-3 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {addColorLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                        Agregar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNuevoColor(false); setNuevoColorNombre('') }}
+                        className="h-8 px-2 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
