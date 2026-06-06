@@ -41,8 +41,6 @@ const PRINT_CSS = `
   }
 `
 
-// ── Ticket rows — inline styles so they render identically
-//    in the modal preview AND inside the iframe ────────────────
 function Row({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', ...style }}>
@@ -81,12 +79,19 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
       '<meta charset="utf-8"><title>Ticket</title>' +
       '<style>' + PRINT_CSS + '</style>' +
       '</head><body>' + node.innerHTML +
-      '<script>' +
-      'window.onload=function(){window.focus();window.print()};' +
-      'window.onafterprint=function(){window.close()};' +
-      '<\/script></body></html>'
+      '</body></html>'
     )
     win.document.close()
+    // Delay close so the ZKTeco printer has time to fully receive the data
+    // before the popup is destroyed (onafterprint fires when Chrome submits
+    // the job to the spooler, not when the paper finishes printing).
+    win.onafterprint = () => setTimeout(() => win.close(), 1500)
+    if (win.document.readyState === 'complete') {
+      win.focus()
+      win.print()
+    } else {
+      win.addEventListener('load', () => { win.focus(); win.print() }, { once: true })
+    }
   }
 
   // ── Email via Resend API ─────────────────────────────────────
