@@ -68,14 +68,18 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[180px]">
-                      <button
-                        onClick={() => { setShowMenu(false); setModalTipo('entrada_compra') }}
-                        className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <Plus className="w-4 h-4 text-green-500" />
-                        Entrada (compra)
-                      </button>
-                      <hr className="my-1 border-slate-100" />
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => { setShowMenu(false); setModalTipo('entrada_compra') }}
+                            className="w-full h-9 px-3 text-sm text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4 text-green-500" />
+                            Entrada (compra)
+                          </button>
+                          <hr className="my-1 border-slate-100" />
+                        </>
+                      )}
                       <Link
                         href={`/inventario/${producto.id}`}
                         onClick={() => setShowMenu(false)}
