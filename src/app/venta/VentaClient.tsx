@@ -786,24 +786,32 @@ export default function VentaClient() {
 
     const supabase           = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: actuales } = await supabase
-      .from('productos')
-      .select('id, stock_fisico, nombre')
-      .in('id', carrito.map(i => i.producto.id))
 
-    // Stock validation — para colores validar contra producto_colores
+    const productoIds = [...new Set(carrito.map(i => i.producto.id))]
+    const [{ data: actuales }, { data: coloresActuales }] = await Promise.all([
+      supabase.from('productos').select('id, stock_fisico, nombre').in('id', productoIds),
+      supabase.from('producto_colores').select('producto_id, nombre, stock').in('producto_id', productoIds),
+    ])
+
+    // Stock validation — colores: validar contra producto_colores fresco (no el colorStock stale del carrito)
     for (const item of carrito) {
       const actual = actuales?.find(p => p.id === item.producto.id)
       const piezas = piezasReales(item)
-      if (!actual || actual.stock_fisico < piezas) {
-        setError(`Sin stock suficiente: ${actual?.nombre ?? item.producto.nombre}`)
-        setConfirmando(false)
-        return
-      }
+
       if (item.colorNombre) {
-        const colorStock = item.colorStock ?? 0
-        if (colorStock < piezas) {
+        // Producto con variante de color: checa el stock del color específico desde la DB
+        const colorActual = coloresActuales?.find(
+          c => c.producto_id === item.producto.id && c.nombre === item.colorNombre
+        )
+        if (!colorActual || colorActual.stock < piezas) {
           setError(`Sin stock del color "${item.colorNombre}" para: ${item.producto.nombre}`)
+          setConfirmando(false)
+          return
+        }
+      } else {
+        // Producto sin variantes: checa stock_fisico total
+        if (!actual || actual.stock_fisico < piezas) {
+          setError(`Sin stock suficiente: ${actual?.nombre ?? item.producto.nombre}`)
           setConfirmando(false)
           return
         }
