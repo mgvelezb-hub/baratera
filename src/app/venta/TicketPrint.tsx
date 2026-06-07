@@ -177,6 +177,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               Col. Centro, Cuauhtémoc, 06000, CDMX
             </p>
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>lamasbaratera.com.mx</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>5552997230</p>
             <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
 
             <Divider />
@@ -243,7 +244,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
 
             <Divider />
             <p style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>Gracias por su compra</p>
-            <p style={{ textAlign: 'center', fontSize: '11px' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '11px' }}>Vuelva pronto, Bendiciones</p>
           </div>
         </div>
 
