@@ -11,13 +11,15 @@ import MovimientoModal from './MovimientoModal'
 import EditarProductoModal from '@/app/inventario/EditarProductoModal'
 
 interface Props {
-  producto:  Producto
-  colores?:  ProductoColor[]
-  isAdmin:   boolean
-  onRefresh: () => void
+  producto:    Producto
+  colores?:    ProductoColor[]
+  isAdmin:     boolean
+  canEntrada?: boolean   // admin o encargado pueden dar entrada
+  showCostos?: boolean   // admin ve proveedor y precio; encargado no
+  onRefresh:   () => void
 }
 
-export default function ProductoCard({ producto, colores = [], isAdmin, onRefresh }: Props) {
+export default function ProductoCard({ producto, colores = [], isAdmin, canEntrada = false, showCostos = false, onRefresh }: Props) {
   const [showMenu,       setShowMenu]       = useState(false)
   const [showEditar,     setShowEditar]     = useState(false)
   const [modalTipo,      setModalTipo]      = useState<'entrada_compra' | null>(null)
@@ -68,7 +70,7 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[180px]">
-                      {isAdmin && (
+                      {canEntrada && (
                         <>
                           <button
                             onClick={() => { setShowMenu(false); setModalTipo('entrada_compra') }}
@@ -159,6 +161,7 @@ export default function ProductoCard({ producto, colores = [], isAdmin, onRefres
           producto={producto}
           colores={colores}
           defaultTipo={modalTipo}
+          showCostos={showCostos}
           onClose={() => setModalTipo(null)}
           onSuccess={handleMovimientoSuccess}
         />

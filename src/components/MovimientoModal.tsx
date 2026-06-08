@@ -24,6 +24,7 @@ interface Props {
   onClose:      () => void
   onSuccess:    () => void
   defaultTipo?: MovimientoTipo
+  showCostos?:  boolean   // false → oculta proveedor y precio de compra (rol encargado)
 }
 
 const TIPOS_VISIBLES: MovimientoTipo[] = ['entrada_compra', 'ajuste_positivo', 'ajuste_negativo', 'devolucion']
@@ -61,7 +62,7 @@ function StepperInline({
 }
 
 export default function MovimientoModal({
-  producto, colores = [], onClose, onSuccess, defaultTipo = 'entrada_compra',
+  producto, colores = [], onClose, onSuccess, defaultTipo = 'entrada_compra', showCostos = true,
 }: Props) {
   const [tipo,            setTipo]            = useState<MovimientoTipo>(defaultTipo)
   const [cantidad,        setCantidad]        = useState('')
@@ -529,8 +530,8 @@ export default function MovimientoModal({
             )}
           </div>
 
-          {/* Datos de compra */}
-          {esEntrada && (
+          {/* Datos de compra — solo admin (showCostos). Encargado puede entrar stock sin ver costos */}
+          {esEntrada && showCostos && (
             <div className="space-y-3 border-t border-slate-100 pt-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Datos de compra</p>
               <div>

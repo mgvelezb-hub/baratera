@@ -18,7 +18,7 @@ export default function InventarioClient() {
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroSemaforo>('todos')
   const [showNuevo, setShowNuevo] = useState(false)
-  const { isAdmin } = useIsAdmin()
+  const { isAdmin, canEntrada, showCostos } = useIsAdmin()
 
   const fetchProductos = useCallback(async () => {
     const supabase = createClient()
@@ -170,6 +170,8 @@ export default function InventarioClient() {
               producto={producto}
               colores={coloresMap.get(producto.id) ?? []}
               isAdmin={isAdmin}
+              canEntrada={canEntrada}
+              showCostos={showCostos}
               onRefresh={fetchProductos}
             />
           ))}
