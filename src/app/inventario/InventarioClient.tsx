@@ -65,7 +65,7 @@ export default function InventarioClient() {
           <h1 className="text-xl font-semibold text-slate-900">Inventario</h1>
           <p className="text-sm text-slate-500 mt-0.5">{productos.length} productos</p>
         </div>
-        {isAdmin && (
+        {canEntrada && (
           <button
             onClick={() => setShowNuevo(true)}
             className="h-10 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
@@ -182,6 +182,7 @@ export default function InventarioClient() {
         <NuevoProductoModal
           onClose={() => setShowNuevo(false)}
           onSuccess={() => { setShowNuevo(false); fetchProductos() }}
+          showCostos={showCostos}
         />
       )}
     </div>

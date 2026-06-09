@@ -27,11 +27,12 @@ const UNIDADES = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par',
 const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
 
 interface Props {
-  onClose: () => void
+  onClose:     () => void
+  showCostos?: boolean   // false → oculta proveedor y precio de compra (rol encargado)
   onSuccess: () => void
 }
 
-export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
+export default function NuevoProductoModal({ onClose, onSuccess, showCostos = true }: Props) {
   const [loading,              setLoading]              = useState(false)
   const [error,                setError]                = useState('')
   const [coloresDraft,         setColoresDraft]         = useState<ColorDraft[]>([])
@@ -541,8 +542,8 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
             </div>
           </div>
 
-          {/* ── Datos de compra (opcional) ─────────────────── */}
-          <div className="border-t border-slate-100 pt-4 space-y-3">
+          {/* ── Datos de compra (opcional) — solo admin ────── */}
+          {showCostos && <div className="border-t border-slate-100 pt-4 space-y-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Datos de compra <span className="normal-case font-normal text-slate-400">(opcional)</span>
             </p>
@@ -583,7 +584,7 @@ export default function NuevoProductoModal({ onClose, onSuccess }: Props) {
                 />
               </div>
             </div>
-          </div>
+          </div>}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
