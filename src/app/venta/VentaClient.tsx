@@ -790,8 +790,23 @@ export default function VentaClient() {
     const productoIds = [...new Set(carrito.map(i => i.producto.id))]
     const [{ data: actuales }, { data: coloresActuales }] = await Promise.all([
       supabase.from('productos').select('id, stock_fisico, nombre').in('id', productoIds),
-      supabase.from('producto_colores').select('producto_id, nombre, stock').in('producto_id', productoIds),
+      supabase.from('producto_colores').select('id, producto_id, nombre, stock').in('producto_id', productoIds),
     ])
+
+    // C3: Validar que el total de piezas por producto no excede stock_fisico
+    const totalPiezasPorProducto = new Map<string, number>()
+    for (const item of carrito) {
+      const id = item.producto.id
+      totalPiezasPorProducto.set(id, (totalPiezasPorProducto.get(id) ?? 0) + piezasReales(item))
+    }
+    for (const [productoId, totalPiezas] of totalPiezasPorProducto) {
+      const actual = actuales?.find(p => p.id === productoId)
+      if (actual && actual.stock_fisico < totalPiezas) {
+        setError(`Sin stock suficiente: ${actual.nombre} (necesitas ${totalPiezas} pzas, hay ${actual.stock_fisico})`)
+        setConfirmando(false)
+        return
+      }
+    }
 
     // Stock validation — colores: validar contra producto_colores fresco (no el colorStock stale del carrito)
     for (const item of carrito) {
@@ -875,10 +890,11 @@ export default function VentaClient() {
       })
 
       await supabase.from('productos').update({ stock_fisico: nuevoStock }).eq('id', item.producto.id)
+      actual.stock_fisico = nuevoStock  // C2: evitar lectura stale en siguiente iteración del mismo producto
 
       // Actualizar stock de la variante de color
       if (item.colorNombre) {
-        const colorRow = (coloresMap.get(item.producto.id) ?? []).find(c => c.nombre === item.colorNombre)
+        const colorRow = coloresActuales?.find(c => c.producto_id === item.producto.id && c.nombre === item.colorNombre)
         if (colorRow) {
           await supabase
             .from('producto_colores')
