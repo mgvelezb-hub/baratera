@@ -788,10 +788,15 @@ export default function VentaClient() {
     const { data: { user } } = await supabase.auth.getUser()
 
     const productoIds = [...new Set(carrito.map(i => i.producto.id))]
-    const [{ data: actuales }, { data: coloresActuales }] = await Promise.all([
+    const [{ data: actuales, error: errActuales }, { data: coloresActuales, error: errColores }] = await Promise.all([
       supabase.from('productos').select('id, stock_fisico, nombre').in('id', productoIds),
       supabase.from('producto_colores').select('id, producto_id, nombre, stock').in('producto_id', productoIds),
     ])
+    if (errActuales || errColores) {
+      setError('Error de conexión al validar stock. Intenta de nuevo.')
+      setConfirmando(false)
+      return
+    }
 
     // C3: Validar que el total de piezas por producto no excede stock_fisico
     const totalPiezasPorProducto = new Map<string, number>()
@@ -814,6 +819,12 @@ export default function VentaClient() {
       const piezas = piezasReales(item)
 
       if (item.colorNombre) {
+        // C6: producto padre pudo eliminarse después de armar el carrito
+        if (!actual) {
+          setError(`Producto no disponible: ${item.producto.nombre}`)
+          setConfirmando(false)
+          return
+        }
         // Producto con variante de color: checa el stock del color específico desde la DB
         const colorActual = coloresActuales?.find(
           c => c.producto_id === item.producto.id && c.nombre === item.colorNombre

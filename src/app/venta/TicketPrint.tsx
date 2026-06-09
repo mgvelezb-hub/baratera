@@ -242,6 +242,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               </Row>
             )}
 
+            <Divider />
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>¡Gracias por su compra!</p>
+            <p style={{ textAlign: 'center', fontSize: '11px' }}>Vuelva pronto</p>
+
           </div>
         </div>
 

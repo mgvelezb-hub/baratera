@@ -14,7 +14,7 @@ export function useIsAdmin() {
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      setRole(user?.user_metadata?.role ?? null)
+      setRole(user?.app_metadata?.role ?? null)
       setLoading(false)
     })
   }, [])

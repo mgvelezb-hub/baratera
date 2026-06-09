@@ -259,8 +259,11 @@ export default function MovimientoModal({
     if (colorSeleccionado) {
       const colorRow = colores.find(c => c.nombre === colorSeleccionado)
       if (colorRow) {
+        // C8: re-consultar stock actual desde DB para evitar calcular sobre prop stale
+        const { data: freshColor } = await supabase.from('producto_colores').select('stock').eq('id', colorRow.id).single()
+        const stockBase = freshColor?.stock ?? colorRow.stock
         await supabase.from('producto_colores')
-          .update({ stock: Math.max(0, colorRow.stock + (tipoConfig.signo * cantidadNum)) })
+          .update({ stock: Math.max(0, stockBase + (tipoConfig.signo * cantidadNum)) })
           .eq('id', colorRow.id)
       }
     }
