@@ -31,6 +31,8 @@ const HEADER_MAP: Record<string, keyof FilaImportada> = {
   'subcategoría':          'subcategoria',
   'existencia de cajas':   'existencia_cajas',
   'existencia de piezas':  'existencia_piezas',
+  'cajas':                 'existencia_cajas',
+  'piezas':                'existencia_piezas',
   'piezas por caja':       'piezas_por_caja',
   'precio menudeo':        'precio_menudeo',
   'precio mayoreo':        'precio_mayoreo',
