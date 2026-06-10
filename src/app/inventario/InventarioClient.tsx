@@ -91,7 +91,7 @@ export default function InventarioClient() {
               <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
               <span className="text-xs font-medium text-red-700">Crítico</span>
             </div>
-            <p className="text-2xl font-bold text-red-600">{counts.rojo}</p>
+            <p className="text-xl font-bold text-red-600">{counts.rojo}</p>
           </button>
           <button
             onClick={() => setFiltro(filtro === 'amarillo' ? 'todos' : 'amarillo')}
@@ -103,7 +103,7 @@ export default function InventarioClient() {
               <Package className="w-3.5 h-3.5 text-amber-500" />
               <span className="text-xs font-medium text-amber-700">Stock bajo</span>
             </div>
-            <p className="text-2xl font-bold text-amber-600">{counts.amarillo}</p>
+            <p className="text-xl font-bold text-amber-600">{counts.amarillo}</p>
           </button>
           <button
             onClick={() => setFiltro(filtro === 'verde' ? 'todos' : 'verde')}
@@ -115,7 +115,7 @@ export default function InventarioClient() {
               <CheckCircle className="w-3.5 h-3.5 text-green-500" />
               <span className="text-xs font-medium text-green-700">OK</span>
             </div>
-            <p className="text-2xl font-bold text-green-600">{counts.verde}</p>
+            <p className="text-xl font-bold text-green-600">{counts.verde}</p>
           </button>
         </div>
       )}
@@ -128,7 +128,7 @@ export default function InventarioClient() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre, SKU o categoría..."
-          className="w-full h-11 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="w-full h-9 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
         />
       </div>
 

@@ -45,7 +45,7 @@ export default function ProductoCard({ producto, colores = [], isAdmin, canEntra
       <div className={`bg-white rounded-xl border transition-all ${
         semaforo === 'rojo' ? 'border-red-200 bg-red-50/30' : 'border-slate-200 hover:border-slate-300'
       }`}>
-        <div className="p-4">
+        <div className="p-3">
           {/* Header */}
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="min-w-0">
@@ -111,7 +111,7 @@ export default function ProductoCard({ producto, colores = [], isAdmin, canEntra
           {/* Stock */}
           <div className="flex items-end justify-between">
             <div>
-              <p className={`text-xl font-bold leading-none ${
+              <p className={`text-lg font-bold leading-none ${
                 semaforoActivo === 'rojo' ? 'text-red-600' :
                 semaforoActivo === 'amarillo' ? 'text-amber-600' :
                 'text-slate-900'

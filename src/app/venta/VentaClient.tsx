@@ -141,7 +141,7 @@ function ProductoCardPOS({
       <button
         onClick={onAgregar}
         disabled={sinStock}
-        className="w-full text-left p-3 active:scale-[0.98] transition-transform"
+        className="w-full text-left p-2 active:scale-[0.98] transition-transform"
       >
         <div className="flex items-start justify-between gap-2 mb-2">
           <p className="text-sm font-semibold text-slate-900 leading-tight line-clamp-2 flex-1">
@@ -156,7 +156,7 @@ function ProductoCardPOS({
 
         <div className="flex items-end justify-between gap-1">
           <div>
-            <p className="text-base font-bold text-slate-900">
+            <p className="text-sm font-bold text-slate-900">
               {formatMXN(Number(producto.precio_menudeo))}
             </p>
             <div className="flex gap-1.5 mt-0.5">
@@ -605,10 +605,10 @@ function CarritoPanel({
         ))}
       </ul>
 
-      <div className="border-t border-slate-200 p-4 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-4">
+      <div className="border-t border-slate-200 p-3 bg-white shrink-0">
+        <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-medium text-slate-500">Total</span>
-          <span className="text-xl font-bold text-slate-900">{formatMXN(total)}</span>
+          <span className="text-lg font-bold text-slate-900">{formatMXN(total)}</span>
         </div>
         <button
           onClick={onConfirmar}
@@ -1019,14 +1019,14 @@ export default function VentaClient() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar por nombre, SKU o categoría..."
-                className="w-full h-11 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full h-9 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             </div>
             {/* Toggle carrito desktop */}
             <button
               onClick={() => setShowCartPanel(v => !v)}
               title={showCartPanel ? 'Ocultar carrito' : 'Mostrar carrito'}
-              className="hidden lg:flex items-center justify-center w-11 h-11 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-violet-600 transition-colors shrink-0 relative"
+              className="hidden lg:flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-violet-600 transition-colors shrink-0 relative"
             >
               <ShoppingCart className="w-4 h-4" />
               {carrito.length > 0 && (
@@ -1097,7 +1097,7 @@ export default function VentaClient() {
               </p>
             </div>
           ) : (
-            <div className={`grid gap-3 pb-24 lg:pb-4 ${showCartPanel ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'}`}>
+            <div className={`grid gap-2 pb-24 lg:pb-4 ${showCartPanel ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'}`}>
               {productosFiltrados.map(p => (
                 <ProductoCardPOS
                   key={p.id}
@@ -1114,8 +1114,8 @@ export default function VentaClient() {
       </div>
 
       {/* ── Desktop cart ────────────────────────────────────── */}
-      {showCartPanel && <div className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white">
-        <div className="flex items-center justify-between h-14 px-4 border-b border-slate-200 shrink-0">
+      {showCartPanel && <div className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 border-l border-slate-200 bg-white">
+        <div className="flex items-center justify-between h-12 px-4 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-slate-600" />
             <span className="text-sm font-semibold text-slate-900">Carrito</span>
