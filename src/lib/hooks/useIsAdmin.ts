@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 // Roles del sistema:
-//   admin     → acceso total
-//   encargado → mismos que cajero + puede dar entrada, pero sin ver costos/proveedores
-//   (otros)   → cajero básico
+//   developer → acceso total + módulo de configuraciones
+//   admin     → acceso total al negocio
+//   encargado → inventario (ver + entrada + agregar) sin costos
+//   (otros)   → cajero básico (solo POS + ver inventario)
 
 export function useIsAdmin() {
   const [role, setRole] = useState<string | null>(null)
@@ -14,15 +15,21 @@ export function useIsAdmin() {
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      setRole(user?.app_metadata?.role ?? null)
+      const base = user?.app_metadata?.role ?? null
+      // Soporte para simulación de rol en desarrollo (solo developer)
+      const simRole = typeof window !== 'undefined' ? localStorage.getItem('devSimRole') : null
+      setRole(simRole ?? base)
       setLoading(false)
     })
   }, [])
 
+  const isDeveloper = role === 'developer'
+
   return {
-    isAdmin:    role === 'admin',
-    canEntrada: role === 'admin' || role === 'encargado',
-    showCostos: role === 'admin',   // encargado puede entrar stock pero no ve proveedor ni precio
+    isDeveloper,
+    isAdmin:    isDeveloper || role === 'admin',
+    canEntrada: isDeveloper || role === 'admin' || role === 'encargado',
+    showCostos: isDeveloper || role === 'admin',
     loading,
   }
 }

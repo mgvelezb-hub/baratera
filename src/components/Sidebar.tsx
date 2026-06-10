@@ -6,27 +6,28 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Package, ShoppingCart, ClipboardList, Globe,
   MessageCircle, Users, BarChart3, LogOut, Menu, X, Clock,
-  Building2, Receipt, Scissors,
+  Building2, Receipt, Scissors, Settings,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { cn } from '@/lib/utils'
 
 const MODULES = [
-  { id: 'inventario',  label: 'Inventario',    href: '/inventario',  icon: Package,      built: true,  adminOnly: false },
-  { id: 'venta',       label: 'Venta física',  href: '/venta',       icon: ShoppingCart, built: true,  adminOnly: false },
-  { id: 'corte',       label: 'Corte de caja', href: '/corte',       icon: Scissors,     built: true,  adminOnly: true  },
-  { id: 'proveedores', label: 'Proveedores',   href: '/proveedores', icon: Building2,    built: true,  adminOnly: true  },
-  { id: 'costos',      label: 'Costos',        href: '/costos',      icon: Receipt,      built: true,  adminOnly: true  },
-  { id: 'dashboard',   label: 'Dashboard',     href: '/dashboard',   icon: BarChart3,    built: true,  adminOnly: true  },
-  { id: 'pedidos',     label: 'Pedidos',       href: '/pedidos',     icon: ClipboardList,built: false, adminOnly: true  },
-  { id: 'clientes',    label: 'Clientes',      href: '/clientes',    icon: Users,        built: false, adminOnly: true  },
+  { id: 'inventario',      label: 'Inventario',      href: '/inventario',      icon: Package,      built: true,  adminOnly: false, devOnly: false },
+  { id: 'venta',           label: 'Venta física',    href: '/venta',           icon: ShoppingCart, built: true,  adminOnly: false, devOnly: false },
+  { id: 'corte',           label: 'Corte de caja',   href: '/corte',           icon: Scissors,     built: true,  adminOnly: true,  devOnly: false },
+  { id: 'proveedores',     label: 'Proveedores',     href: '/proveedores',     icon: Building2,    built: true,  adminOnly: true,  devOnly: false },
+  { id: 'costos',          label: 'Costos',          href: '/costos',          icon: Receipt,      built: true,  adminOnly: true,  devOnly: false },
+  { id: 'dashboard',       label: 'Dashboard',       href: '/dashboard',       icon: BarChart3,    built: true,  adminOnly: true,  devOnly: false },
+  { id: 'pedidos',         label: 'Pedidos',         href: '/pedidos',         icon: ClipboardList,built: false, adminOnly: true,  devOnly: false },
+  { id: 'clientes',        label: 'Clientes',        href: '/clientes',        icon: Users,        built: false, adminOnly: true,  devOnly: false },
+  { id: 'configuraciones', label: 'Configuraciones', href: '/configuraciones', icon: Settings,     built: true,  adminOnly: false, devOnly: true  },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {
   const pathname      = usePathname()
   const router        = useRouter()
-  const { isAdmin }   = useIsAdmin()
+  const { isAdmin, isDeveloper } = useIsAdmin()
 
   async function handleLogout() {
     await createClient().auth.signOut()
@@ -37,7 +38,11 @@ function NavContent({ onClose }: { onClose?: () => void }) {
   return (
     <>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {MODULES.filter(mod => !mod.adminOnly || isAdmin).map(mod => {
+        {MODULES.filter(mod => {
+          if (mod.devOnly)   return isDeveloper
+          if (mod.adminOnly) return isAdmin
+          return true
+        }).map(mod => {
           const Icon     = mod.icon
           const isActive = pathname.startsWith(mod.href)
 
