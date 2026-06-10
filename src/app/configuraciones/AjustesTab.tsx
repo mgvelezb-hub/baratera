@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import type { AppConfig, ColorPaleta } from '@/lib/config'
 import { invalidateConfigCache } from '@/lib/hooks/useConfig'
+import { colorStyle } from '@/lib/utils'
 
 interface Props {
   config:           AppConfig
@@ -258,12 +259,21 @@ export default function AjustesTab({ config, migrationPending, onSaved, showToas
         <div className="grid sm:grid-cols-2 gap-1.5 mb-2">
           {inv.colores.map((c, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
-                type="color"
-                value={c.hex}
-                onChange={e => setColor(i, 'hex', e.target.value)}
-                className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer shrink-0"
-              />
+              {c.gradient ? (
+                /* Surtido: mostrar bolita con gradiente, sin editor de color */
+                <span
+                  className="w-8 h-8 rounded-lg shrink-0 border border-slate-200"
+                  style={{ background: c.gradient }}
+                  title={c.nombre}
+                />
+              ) : (
+                <input
+                  type="color"
+                  value={c.hex}
+                  onChange={e => setColor(i, 'hex', e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer shrink-0"
+                />
+              )}
               <input
                 type="text"
                 value={c.nombre}

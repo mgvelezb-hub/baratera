@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfig } from '@/lib/hooks/useConfig'
 import { CONFIG_DEFAULTS } from '@/lib/config'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatNum } from '@/lib/utils'
+import { formatNum, colorStyle } from '@/lib/utils'
 
 // Paleta de colores presets
 const UNIDADES   = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
@@ -540,7 +540,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                                 className={`w-6 h-6 rounded-full border-2 transition-all ${
                                   editColorHex === cp.hex ? 'border-violet-600 scale-110' : 'border-transparent'
                                 }`}
-                                style={{ backgroundColor: cp.hex }}
+                                style={colorStyle(cp.nombre, cp.hex)}
                               />
                             ))}
                           </div>
@@ -567,7 +567,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                         /* ── Vista normal ── */
                         <div className="flex items-center justify-between mb-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                            <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={colorStyle(c.nombre, c.hex)} />
                             <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
                             {delta !== 0 && (
                               <span className={`text-xs font-semibold ${delta > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -678,7 +678,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                             : 'border-slate-200 hover:border-violet-300 text-slate-600'
                       }`}
                     >
-                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: cp.hex }} />
+                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={colorStyle(cp.nombre, cp.hex)} />
                       {cp.nombre}
                       {isSel && <span className="text-violet-500 font-bold">✓</span>}
                     </button>
@@ -737,7 +737,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                       type="button"
                       onClick={() => { setNuevoColorHex(cp.hex); setNuevoColorNombre(cp.nombre) }}
                       className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === cp.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
-                      style={{ backgroundColor: cp.hex }}
+                      style={colorStyle(cp.nombre, cp.hex)}
                       title={cp.nombre}
                     />
                   ))}

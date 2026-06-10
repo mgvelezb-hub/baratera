@@ -51,6 +51,19 @@ export function formatStockConCajas(stock: number, piezasPorCaja: number | null,
   return `${formatNum(unidades)} ${labelU} + ${formatNum(piezas)} pzas`
 }
 
+// Gradientes para colores "Surtido" — usados en cualquier componente que muestre bolitas de color
+export const COLOR_GRADIENTS: Record<string, string> = {
+  'Surtido color fuerte':     'conic-gradient(from 0deg, #FF0000, #FF6600, #FFCC00, #33CC33, #0066FF, #9900CC, #FF0000)',
+  'Surtido color pastel':     'conic-gradient(from 0deg, #FFD1DC, #FFDAB9, #FFFACD, #B5EAD7, #B0C4DE, #E6B0FF, #FFD1DC)',
+  'Surtido colores intensos': 'conic-gradient(from 0deg, #FF0000, #FF4500, #FF8800, #00BB00, #0000DD, #8800AA, #FF0000)',
+  'Surtido':                  'conic-gradient(from 0deg, #FF0000, #FF8C00, #FFD500, #00A550, #4169E1, #8B008B, #FF0000)',
+}
+
+export function colorStyle(nombre: string, hex: string): { background?: string; backgroundColor?: string } {
+  const g = COLOR_GRADIENTS[nombre]
+  return g ? { background: g } : { backgroundColor: hex }
+}
+
 export function formatFechaCorta(dateStr: string): string {
   return new Intl.DateTimeFormat('es-MX', {
     day: '2-digit',

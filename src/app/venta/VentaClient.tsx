@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Producto, ProductoColor } from '@/lib/types'
-import { formatMXN, formatNum, formatStockConCajas } from '@/lib/utils'
+import { formatMXN, formatNum, formatStockConCajas, colorStyle } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
 import PaymentModal, { type PaymentData } from './PaymentModal'
 import TicketPrint, { type TicketItem } from './TicketPrint'
@@ -209,7 +209,7 @@ function ProductoCardPOS({
                 <div className="flex items-center gap-1.5">
                   <span
                     className="w-3 h-3 rounded-full border border-black/10 shrink-0"
-                    style={{ backgroundColor: c.hex }}
+                    style={colorStyle(c.nombre, c.hex)}
                   />
                   <span className="text-xs text-slate-600 font-medium">{c.nombre}</span>
                 </div>
@@ -345,7 +345,7 @@ function AgregarProductoModal({
                             : 'border-slate-200 hover:border-violet-300 active:scale-[0.97]'
                       }`}
                     >
-                      <span className="w-5 h-5 rounded-full border border-black/10 shrink-0 relative" style={{ backgroundColor: c.hex }}>
+                      <span className="w-5 h-5 rounded-full border border-black/10 shrink-0 relative" style={colorStyle(c.nombre, c.hex)}>
                         {isSel && (
                           <span className="absolute inset-0 flex items-center justify-center">
                             <svg className="w-3 h-3 text-white drop-shadow" fill="none" viewBox="0 0 12 12">

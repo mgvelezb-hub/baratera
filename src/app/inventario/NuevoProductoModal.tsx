@@ -5,7 +5,7 @@ import { X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useConfig } from '@/lib/hooks/useConfig'
 import { CONFIG_DEFAULTS } from '@/lib/config'
-import { formatNum, formatStockConCajas } from '@/lib/utils'
+import { formatNum, formatStockConCajas, colorStyle } from '@/lib/utils'
 import type { Proveedor } from '@/lib/types'
 
 interface ColorDraft { nombre: string; hex: string; stock: number; stock_minimo: number }
@@ -408,7 +408,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                             : 'border-slate-200 hover:border-violet-300 text-slate-600'
                       }`}
                     >
-                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: cp.hex }} />
+                      <span className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style={colorStyle(cp.nombre, cp.hex)} />
                       {cp.nombre}
                       {isSel && <span className="text-violet-500 font-bold">✓</span>}
                     </button>
@@ -479,7 +479,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                     <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <div className="flex items-center justify-between mb-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={colorStyle(c.nombre, c.hex)} />
                           <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
                         </div>
                         <button
@@ -537,7 +537,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                     type="button"
                     onClick={() => { setNuevoColorHex(cp.hex); setNuevoColorNombre(cp.nombre); setColorError('') }}
                     className={`w-7 h-7 rounded-full border-2 transition-all ${nuevoColorHex === cp.hex ? 'border-violet-500 scale-110' : 'border-white shadow'}`}
-                    style={{ backgroundColor: cp.hex }}
+                    style={colorStyle(cp.nombre, cp.hex)}
                     title={cp.nombre}
                   />
                 ))}
