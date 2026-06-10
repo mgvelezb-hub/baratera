@@ -19,6 +19,7 @@ const ACCION_META: Record<string, { label: string; color: string }> = {
   'datos.reset':       { label: 'Reset de datos',   color: 'bg-red-100 text-red-700'       },
   'datos.exportados':  { label: 'Exportación',      color: 'bg-violet-100 text-violet-700' },
   'datos.seed':        { label: 'Datos demo',       color: 'bg-emerald-100 text-emerald-700' },
+  'datos.importados':  { label: 'Importación Excel', color: 'bg-blue-100 text-blue-700'      },
   'config.editada':    { label: 'Config editada',   color: 'bg-slate-100 text-slate-600'   },
 }
 

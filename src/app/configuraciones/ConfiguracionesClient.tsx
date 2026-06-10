@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Users, Database, Monitor, RefreshCw,
   Trash2, AlertTriangle, CheckCircle2, Loader2, Shield,
-  Activity, Server, KeyRound, SlidersHorizontal, ScrollText, Download, Sprout,
+  Activity, Server, KeyRound, SlidersHorizontal, ScrollText, Download, Sprout, UploadCloud,
 } from 'lucide-react'
 import RolesTab, { type RoleRow } from './RolesTab'
 import AjustesTab from './AjustesTab'
 import AuditoriaTab from './AuditoriaTab'
+import ImportarTab from './ImportarTab'
 import { invalidateRoleCache } from '@/lib/hooks/useIsAdmin'
 import { CONFIG_DEFAULTS, type AppConfig } from '@/lib/config'
 
@@ -29,7 +30,7 @@ interface Stats {
   url:       string
 }
 
-type Tab = 'usuarios' | 'perfiles' | 'ajustes' | 'datos' | 'auditoria' | 'sistema'
+type Tab = 'usuarios' | 'perfiles' | 'ajustes' | 'importar' | 'datos' | 'auditoria' | 'sistema'
 
 // ── Constants ──────────────────────────────────────────────────
 const ROLE_META: Record<string, { label: string; color: string }> = {
@@ -266,6 +267,7 @@ export default function ConfiguracionesClient() {
           { id: 'usuarios',  label: 'Usuarios',  Icon: Users              },
           { id: 'perfiles',  label: 'Perfiles',  Icon: KeyRound           },
           { id: 'ajustes',   label: 'Ajustes',   Icon: SlidersHorizontal  },
+          { id: 'importar',  label: 'Importar',  Icon: UploadCloud        },
           { id: 'datos',     label: 'Datos',     Icon: Database           },
           { id: 'auditoria', label: 'Auditoría', Icon: ScrollText         },
           { id: 'sistema',   label: 'Sistema',   Icon: Monitor            },
@@ -382,6 +384,9 @@ export default function ConfiguracionesClient() {
           showToast={showToast}
         />
       )}
+
+      {/* ── TAB IMPORTAR ─────────────────────────────────────────── */}
+      {tab === 'importar' && <ImportarTab showToast={showToast} />}
 
       {/* ── TAB AUDITORÍA ────────────────────────────────────────── */}
       {tab === 'auditoria' && <AuditoriaTab />}
