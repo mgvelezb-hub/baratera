@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/AppShell'
+import { requirePermiso } from '@/lib/permisos-server'
 import CostosClient from './CostosClient'
 
 export const revalidate = 0
 
 export default async function CostosPage() {
+  await requirePermiso('costos.ver')
+
   const supabase = await createClient()
 
   const mesInicio = new Date()

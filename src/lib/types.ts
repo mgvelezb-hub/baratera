@@ -41,9 +41,18 @@ export type MovimientoTipo =
   | 'ajuste_negativo'
   | 'devolucion'
 
+// Factor del umbral amarillo — configurable desde /configuraciones
+// (clave inventario.semaforo_factor). Lo propagan useConfig (cliente)
+// y las páginas server que leen la tabla configuracion.
+let SEMAFORO_FACTOR = 1.5
+
+export function setSemaforoFactor(factor: number) {
+  if (Number.isFinite(factor) && factor >= 1) SEMAFORO_FACTOR = factor
+}
+
 export function calcularSemaforo(stockFisico: number, stockMinimo: number): StockSemaforo {
   if (stockFisico < stockMinimo) return 'rojo'
-  if (stockFisico < stockMinimo * 1.5) return 'amarillo'
+  if (stockFisico < stockMinimo * SEMAFORO_FACTOR) return 'amarillo'
   return 'verde'
 }
 

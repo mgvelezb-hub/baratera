@@ -787,6 +787,19 @@ export default function VentaClient() {
     const supabase           = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Modo mantenimiento: bloquear ventas (consulta fresca, sin caché)
+    const { data: mantRow } = await supabase
+      .from('configuracion')
+      .select('valor')
+      .eq('clave', 'mantenimiento')
+      .maybeSingle()
+    const mant = mantRow?.valor as { activo?: boolean; mensaje?: string } | null
+    if (mant?.activo === true) {
+      setError(mant.mensaje || 'Sistema en mantenimiento. Las ventas están pausadas.')
+      setConfirmando(false)
+      return
+    }
+
     const productoIds = [...new Set(carrito.map(i => i.producto.id))]
     const [{ data: actuales, error: errActuales }, { data: coloresActuales, error: errColores }] = await Promise.all([
       supabase.from('productos').select('id, stock_fisico, nombre').in('id', productoIds),

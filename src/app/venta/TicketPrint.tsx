@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Printer, Mail, X } from 'lucide-react'
 import { formatMXN, pluralUnidad } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
+import { useConfig } from '@/lib/hooks/useConfig'
 
 export interface TicketItem {
   nombre:          string
@@ -139,6 +140,9 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     }
   }
 
+  const { config } = useConfig()
+  const negocio = config.negocio
+
   const TABS = [
     { id: 'imprimir', label: 'Imprimir', Icon: Printer },
     { id: 'correo',   label: 'Correo',   Icon: Mail    },
@@ -173,11 +177,11 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               <div style={{ background: '#000', height: '2px' }} />
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.3, marginBottom: '2px' }}>
-              Calle Mesones 123, 2º piso (mano izquierda)<br />
-              Col. Centro, Cuauhtémoc, 06000, CDMX
+              {negocio.direccion1}<br />
+              {negocio.direccion2}
             </p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>lamasbaratera.com.mx</p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>5619952549</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.web}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.telefono}</p>
             <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
 
             <Divider />
@@ -243,8 +247,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             )}
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>¡Gracias por su compra!</p>
-            <p style={{ textAlign: 'center', fontSize: '11px' }}>Vuelva pronto</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.footer1}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px' }}>{negocio.footer2}</p>
 
           </div>
         </div>

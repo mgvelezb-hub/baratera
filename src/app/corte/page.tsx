@@ -1,11 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/AppShell'
+import { requirePermiso } from '@/lib/permisos-server'
 import CorteClient from './CorteClient'
 import type { Venta, CorteCaja } from '@/lib/types'
 
 export const revalidate = 0
 
 export default async function CortePage() {
+  await requirePermiso('corte.ver')
+
   const supabase  = await createClient()
   const todayStr  = new Date().toISOString().split('T')[0]
   const todayStart = `${todayStr}T00:00:00`

@@ -27,6 +27,18 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
 
+  // Destinatario configurable desde /configuraciones (clave alertas.email)
+  let alertEmail = 'lamasbaratera@gmail.com'
+  const { data: configRow } = await supabase
+    .from('configuracion')
+    .select('valor')
+    .eq('clave', 'alertas')
+    .maybeSingle()
+  if (configRow?.valor && typeof configRow.valor === 'object') {
+    const email = (configRow.valor as { email?: string }).email
+    if (email && email.includes('@')) alertEmail = email
+  }
+
   const today = new Date().toISOString().split('T')[0]
   const cutoff = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
@@ -120,7 +132,7 @@ export async function GET(req: NextRequest) {
   try {
     const { error: resendError } = await resend.emails.send({
       from:    'Baratera OS <sistema@lamasbaratera.com.mx>',
-      to:      'lamasbaratera@gmail.com',
+      to:      alertEmail,
       subject: `⚠️ ${adeudos.length} adeudo${adeudos.length === 1 ? '' : 's'} venciendo — ${formatMXN(totalMonto)}`,
       html,
     })

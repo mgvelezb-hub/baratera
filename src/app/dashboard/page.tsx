@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/AppShell'
+import { requirePermiso } from '@/lib/permisos-server'
 import SalesChart from './SalesChart'
 import type { ChartDay } from './SalesChart'
-import { calcularSemaforo, calcularSemaforoEfectivo, costoMensual, CATEGORIA_META } from '@/lib/types'
+import { calcularSemaforo, calcularSemaforoEfectivo, setSemaforoFactor, costoMensual, CATEGORIA_META } from '@/lib/types'
 import type { CostoFijo, CostoCategoria, ProductoColor } from '@/lib/types'
 import {
   TrendingUp, AlertTriangle, Package, ArrowUpRight, ArrowDownRight,
@@ -71,7 +72,16 @@ function sumTotal(rows: { total: number }[] | null): number {
 export const revalidate = 60
 
 export default async function DashboardPage() {
+  await requirePermiso('dashboard.ver')
+
   const supabase    = await createClient()
+
+  // Factor del semáforo configurable (clave inventario.semaforo_factor)
+  const { data: invConfig } = await supabase
+    .from('configuracion').select('valor').eq('clave', 'inventario').maybeSingle()
+  const factor = (invConfig?.valor as { semaforo_factor?: number } | null)?.semaforo_factor
+  if (factor) setSemaforoFactor(factor)
+
   const now         = new Date()
   const todayStr    = now.toISOString().split('T')[0]
   const todayStart  = `${todayStr}T00:00:00`

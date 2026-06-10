@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logAudit } from '@/lib/audit'
 
 async function verifyDeveloper() {
   const supabase = await createClient()
@@ -26,7 +27,8 @@ const OPS: Record<string, string[]> = {
 }
 
 export async function POST(req: NextRequest) {
-  if (!await verifyDeveloper()) {
+  const caller = await verifyDeveloper()
+  if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -49,5 +51,6 @@ export async function POST(req: NextRequest) {
     results[table] = error ? `ERROR: ${error.message}` : 'OK'
   }
 
+  await logAudit('datos.reset', { module, results }, caller.email)
   return NextResponse.json({ ok: true, module, results })
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logAudit } from '@/lib/audit'
 
 async function verifyDeveloper() {
   const supabase = await createClient()
@@ -35,7 +36,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!await verifyDeveloper()) {
+  const caller = await verifyDeveloper()
+  if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -62,5 +64,6 @@ export async function PATCH(req: NextRequest) {
   const { error } = await admin.auth.admin.updateUserById(userId, { app_metadata: newMeta })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await logAudit('rol.cambiado', { userId, role }, caller.email)
   return NextResponse.json({ ok: true, userId, role })
 }

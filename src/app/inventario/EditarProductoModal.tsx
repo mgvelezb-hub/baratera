@@ -3,27 +3,13 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useConfig } from '@/lib/hooks/useConfig'
+import { CONFIG_DEFAULTS } from '@/lib/config'
 import type { Producto, ProductoColor } from '@/lib/types'
 import { formatNum } from '@/lib/utils'
 
 // Paleta de colores presets
-const COLOR_PALETTE = [
-  { nombre: 'Rojo',      hex: '#ef4444' },
-  { nombre: 'Naranja',   hex: '#f97316' },
-  { nombre: 'Amarillo',  hex: '#eab308' },
-  { nombre: 'Verde',     hex: '#22c55e' },
-  { nombre: 'Azul',      hex: '#3b82f6' },
-  { nombre: 'Morado',    hex: '#a855f7' },
-  { nombre: 'Rosa',      hex: '#ec4899' },
-  { nombre: 'Negro',     hex: '#1e293b' },
-  { nombre: 'Blanco',    hex: '#f8fafc' },
-  { nombre: 'Gris',      hex: '#94a3b8' },
-  { nombre: 'Café',      hex: '#92400e' },
-  { nombre: 'Turquesa',  hex: '#06b6d4' },
-]
-
 const UNIDADES   = ['pza', 'caja', 'kg', 'lt', 'paquete', 'rollo', 'resma', 'par', 'juego']
-const CATEGORIAS = ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro']
 
 interface Props {
   producto: Producto
@@ -32,6 +18,9 @@ interface Props {
 }
 
 export default function EditarProductoModal({ producto, onClose, onSuccess }: Props) {
+  const { config } = useConfig()
+  const COLOR_PALETTE = config.inventario.colores.length > 0 ? config.inventario.colores : CONFIG_DEFAULTS.inventario.colores
+  const CATEGORIAS = config.inventario.categorias.length > 0 ? config.inventario.categorias : CONFIG_DEFAULTS.inventario.categorias
   const [loading,         setLoading]         = useState(false)
   const [error,           setError]           = useState('')
   const [confirmDesact,   setConfirmDesact]   = useState(false)

@@ -5,18 +5,11 @@ import { X, Loader2, Plus, Minus } from 'lucide-react'
 import type { Producto, MovimientoTipo, Proveedor, ProductoColor } from '@/lib/types'
 import { TIPOS_MOVIMIENTO } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+import { useConfig } from '@/lib/hooks/useConfig'
+import { CONFIG_DEFAULTS } from '@/lib/config'
 import { formatNum, formatStockConCajas } from '@/lib/utils'
 
 interface CantColor { cajas: number; piezas: number }
-
-const COLOR_PALETTE = [
-  { nombre: 'Rojo',     hex: '#ef4444' }, { nombre: 'Naranja',  hex: '#f97316' },
-  { nombre: 'Amarillo', hex: '#eab308' }, { nombre: 'Verde',    hex: '#22c55e' },
-  { nombre: 'Azul',     hex: '#3b82f6' }, { nombre: 'Morado',   hex: '#a855f7' },
-  { nombre: 'Rosa',     hex: '#ec4899' }, { nombre: 'Negro',    hex: '#1e293b' },
-  { nombre: 'Blanco',   hex: '#f8fafc' }, { nombre: 'Gris',     hex: '#94a3b8' },
-  { nombre: 'Café',     hex: '#92400e' }, { nombre: 'Turquesa', hex: '#06b6d4' },
-]
 
 interface Props {
   producto:     Producto
@@ -64,6 +57,8 @@ function StepperInline({
 export default function MovimientoModal({
   producto, colores = [], onClose, onSuccess, defaultTipo = 'entrada_compra', showCostos = true,
 }: Props) {
+  const { config } = useConfig()
+  const COLOR_PALETTE = config.inventario.colores.length > 0 ? config.inventario.colores : CONFIG_DEFAULTS.inventario.colores
   const [tipo,            setTipo]            = useState<MovimientoTipo>(defaultTipo)
   const [cantidad,        setCantidad]        = useState('')
   const [notas,           setNotas]           = useState('')

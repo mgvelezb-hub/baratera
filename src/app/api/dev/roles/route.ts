@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { TODAS_LAS_CLAVES, ROLES_FALLBACK, permisosDesdeLista } from '@/lib/permisos'
+import { logAudit } from '@/lib/audit'
 
 async function verifyDeveloper() {
   const supabase = await createClient()
@@ -70,7 +71,8 @@ export async function GET() {
 
 // ── POST: crear un perfil nuevo ──────────────────────────────────
 export async function POST(req: NextRequest) {
-  if (!await verifyDeveloper()) {
+  const caller = await verifyDeveloper()
+  if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -114,12 +116,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  await logAudit('perfil.creado', { nombre, etiqueta }, caller.email)
   return NextResponse.json({ ok: true, role: data })
 }
 
 // ── PATCH: editar etiqueta/descripción/permisos ──────────────────
 export async function PATCH(req: NextRequest) {
-  if (!await verifyDeveloper()) {
+  const caller = await verifyDeveloper()
+  if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -153,12 +157,14 @@ export async function PATCH(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await logAudit('perfil.editado', { id: body.id, nombre: existing.nombre }, caller.email)
   return NextResponse.json({ ok: true, role: data })
 }
 
 // ── DELETE: eliminar perfil (no sistema, sin usuarios asignados) ──
 export async function DELETE(req: NextRequest) {
-  if (!await verifyDeveloper()) {
+  const caller = await verifyDeveloper()
+  if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -194,5 +200,6 @@ export async function DELETE(req: NextRequest) {
   const { error } = await admin.from('roles').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await logAudit('perfil.eliminado', { id, nombre: role.nombre }, caller.email)
   return NextResponse.json({ ok: true })
 }

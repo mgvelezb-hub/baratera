@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Users, Database, Monitor, RefreshCw,
   Trash2, AlertTriangle, CheckCircle2, Loader2, Shield,
-  Activity, Server, KeyRound,
+  Activity, Server, KeyRound, SlidersHorizontal, ScrollText, Download, Sprout,
 } from 'lucide-react'
 import RolesTab, { type RoleRow } from './RolesTab'
+import AjustesTab from './AjustesTab'
+import AuditoriaTab from './AuditoriaTab'
 import { invalidateRoleCache } from '@/lib/hooks/useIsAdmin'
+import { CONFIG_DEFAULTS, type AppConfig } from '@/lib/config'
 
 // ── Types ──────────────────────────────────────────────────────
 interface UserInfo {
@@ -26,7 +29,7 @@ interface Stats {
   url:       string
 }
 
-type Tab = 'usuarios' | 'perfiles' | 'datos' | 'sistema'
+type Tab = 'usuarios' | 'perfiles' | 'ajustes' | 'datos' | 'auditoria' | 'sistema'
 
 // ── Constants ──────────────────────────────────────────────────
 const ROLE_META: Record<string, { label: string; color: string }> = {
@@ -80,6 +83,13 @@ export default function ConfiguracionesClient() {
   const [roleUserCounts,   setRoleUserCounts]   = useState<Record<string, number>>({})
   const [migrationPending, setMigrationPending] = useState(false)
 
+  const [appConfig,              setAppConfig]              = useState<AppConfig>(CONFIG_DEFAULTS)
+  const [configMigrationPending, setConfigMigrationPending] = useState(false)
+
+  const [exportTable, setExportTable] = useState('productos')
+  const [seedLoading, setSeedLoading] = useState(false)
+  const [seedConfirm, setSeedConfirm] = useState(false)
+
   // ── Bootstrap ──────────────────────────────────────────────────
   useEffect(() => {
     setSimRole(localStorage.getItem('devSimRole') ?? '')
@@ -113,6 +123,33 @@ export default function ConfiguracionesClient() {
   }, [])
 
   useEffect(() => { fetchRoles() }, [fetchRoles])
+
+  // ── Fetch app config ──────────────────────────────────────────
+  const fetchAppConfig = useCallback(async () => {
+    const res = await fetch('/api/dev/config')
+    if (res.ok) {
+      const data = await res.json()
+      setAppConfig(data.config ?? CONFIG_DEFAULTS)
+      setConfigMigrationPending(data.migrationPending === true)
+    }
+  }, [])
+
+  useEffect(() => { fetchAppConfig() }, [fetchAppConfig])
+
+  // ── Seed datos demo ───────────────────────────────────────────
+  async function runSeed() {
+    setSeedLoading(true)
+    const res = await fetch('/api/dev/seed', { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      const r = data.resumen
+      showToast(`Demo sembrado: ${r.productos} productos, ${r.colores} colores, ${r.proveedores} proveedor`, true)
+    } else {
+      showToast(data.error ?? 'Error al sembrar', false)
+    }
+    setSeedLoading(false)
+    setSeedConfirm(false)
+  }
 
   // ── Fetch stats ───────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
@@ -224,17 +261,19 @@ export default function ConfiguracionesClient() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 overflow-x-auto">
         {([
-          { id: 'usuarios', label: 'Usuarios', Icon: Users    },
-          { id: 'perfiles', label: 'Perfiles', Icon: KeyRound },
-          { id: 'datos',    label: 'Datos',    Icon: Database },
-          { id: 'sistema',  label: 'Sistema',  Icon: Monitor  },
+          { id: 'usuarios',  label: 'Usuarios',  Icon: Users              },
+          { id: 'perfiles',  label: 'Perfiles',  Icon: KeyRound           },
+          { id: 'ajustes',   label: 'Ajustes',   Icon: SlidersHorizontal  },
+          { id: 'datos',     label: 'Datos',     Icon: Database           },
+          { id: 'auditoria', label: 'Auditoría', Icon: ScrollText         },
+          { id: 'sistema',   label: 'Sistema',   Icon: Monitor            },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 shrink-0 min-w-fit px-2 flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium transition-colors ${
               tab === id
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
@@ -334,6 +373,19 @@ export default function ConfiguracionesClient() {
         />
       )}
 
+      {/* ── TAB AJUSTES ──────────────────────────────────────────── */}
+      {tab === 'ajustes' && (
+        <AjustesTab
+          config={appConfig}
+          migrationPending={configMigrationPending}
+          onSaved={fetchAppConfig}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── TAB AUDITORÍA ────────────────────────────────────────── */}
+      {tab === 'auditoria' && <AuditoriaTab />}
+
       {/* ── TAB DATOS ────────────────────────────────────────────── */}
       {tab === 'datos' && (
         <div>
@@ -379,6 +431,84 @@ export default function ConfiguracionesClient() {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* ── Exportar respaldo ─────────────────────────────── */}
+          <div className="mt-6 bg-white border border-slate-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Download className="w-4 h-4 text-violet-500" />
+              <p className="text-sm font-semibold text-slate-900">Exportar respaldo</p>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              Descarga una copia de cualquier tabla antes de borrar. CSV abre en Excel.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={exportTable}
+                onChange={e => setExportTable(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+              >
+                {['productos', 'producto_colores', 'stock_ledger', 'ventas', 'venta_items',
+                  'cortes_caja', 'proveedores', 'adeudos', 'pagos_proveedor', 'costos_fijos',
+                  'roles', 'configuracion', 'auditoria'].map(t => (
+                  <option key={t} value={t}>{TABLE_LABELS[t] ?? t}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => window.open(`/api/dev/export?table=${exportTable}&format=csv`, '_blank')}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                CSV
+              </button>
+              <button
+                onClick={() => window.open(`/api/dev/export?table=${exportTable}&format=json`, '_blank')}
+                className="h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                JSON
+              </button>
+            </div>
+          </div>
+
+          {/* ── Datos demo ────────────────────────────────────── */}
+          <div className="mt-3 bg-white border border-emerald-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Sprout className="w-4 h-4 text-emerald-500" />
+              <p className="text-sm font-semibold text-slate-900">Datos demo</p>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              Siembra 8 productos [DEMO] con colores, ledger, un proveedor con adeudo y 2 costos fijos
+              para probar flujos completos. ⚠️ Se mezclan con los datos reales — se identifican por el
+              prefijo [DEMO] y se eliminan con el reset de Productos/Proveedores.
+            </p>
+            {seedConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-emerald-700">¿Sembrar en la base de producción?</span>
+                <button
+                  onClick={runSeed}
+                  disabled={seedLoading}
+                  className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1"
+                >
+                  {seedLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sprout className="w-3 h-3" />}
+                  Sí, sembrar
+                </button>
+                <button
+                  onClick={() => setSeedConfirm(false)}
+                  className="h-8 px-3 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setSeedConfirm(true)}
+                className="h-9 px-3 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 text-sm font-medium transition-colors flex items-center gap-1.5"
+              >
+                <Sprout className="w-3.5 h-3.5" />
+                Sembrar datos demo
+              </button>
+            )}
           </div>
 
           {/* Confirm dialog */}
