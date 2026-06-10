@@ -168,9 +168,8 @@ export default function MovimientoModal({
     }
 
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
 
-    // Resolver proveedor
+    // Resolver proveedor (INSERT a proveedores sí pasa por RLS correctamente)
     let finalProveedorId: string | null = null
     if (esEntrada) {
       if (proveedorId === 'nuevo') {
@@ -182,88 +181,85 @@ export default function MovimientoModal({
       }
     }
 
-    // ── MULTI-COLOR ENTRADA ───────────────────────────────────
-    if (esModoMultiColor) {
-      let stockActual = producto.stock_fisico
+    async function callMovimiento(payload: Record<string, unknown>) {
+      const res = await fetch('/api/inventario/movimiento', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? 'Error al guardar movimiento')
+      }
+    }
 
-      for (const color of coloresLocales) {
-        const q = cantColores[color.nombre] ?? { cajas: 0, piezas: 0 }
-        const piezasColor = q.cajas * ppc + q.piezas
-        if (piezasColor === 0) continue
+    try {
+      // ── MULTI-COLOR ENTRADA ─────────────────────────────────
+      if (esModoMultiColor) {
+        let stockActual = producto.stock_fisico
 
-        const stockDespues = stockActual + piezasColor
+        for (const color of coloresLocales) {
+          const q = cantColores[color.nombre] ?? { cajas: 0, piezas: 0 }
+          const piezasColor = q.cajas * ppc + q.piezas
+          if (piezasColor === 0) continue
 
-        await supabase.from('stock_ledger').insert({
-          producto_id:     producto.id,
-          tipo:            'entrada_compra',
-          qty_antes:       stockActual,
-          qty_despues:     stockDespues,
-          notas:           notas || null,
-          canal:           'manual',
-          usuario_id:      user?.id ?? null,
-          color_variante:  color.nombre,
-          proveedor_id:    finalProveedorId,
-          precio_unitario: precioUnitario ? parseFloat(precioUnitario) : null,
-        })
+          const stockDespues = stockActual + piezasColor
+          await callMovimiento({
+            producto_id:       producto.id,
+            tipo:              'entrada_compra',
+            qty_antes:         stockActual,
+            qty_despues:       stockDespues,
+            notas:             notas || null,
+            color_variante:    color.nombre,
+            proveedor_id:      finalProveedorId,
+            precio_unitario:   precioUnitario ? parseFloat(precioUnitario) : null,
+            color_id:          color.id,
+            color_stock_nuevo: color.stock + piezasColor,
+          })
+          stockActual = stockDespues
+        }
 
-        await supabase.from('producto_colores')
-          .update({ stock: color.stock + piezasColor })
-          .eq('id', color.id)
-
-        stockActual = stockDespues
+        onSuccess()
+        return
       }
 
-      await supabase.from('productos').update({ stock_fisico: stockActual }).eq('id', producto.id)
+      // ── SINGLE (ajuste / entrada sin multi-color / devolución) ──
+      const nuevoStockFinal = tipo === 'levantamiento_inventario'
+        ? cantidadNum
+        : producto.stock_fisico + (tipoConfig.signo * cantidadNum)
+
+      let color_id: string | undefined
+      let color_stock_nuevo: number | undefined
+
+      if (colorSeleccionado) {
+        const colorRow = colores.find(c => c.nombre === colorSeleccionado)
+        if (colorRow) {
+          const { data: freshColor } = await supabase.from('producto_colores')
+            .select('stock').eq('id', colorRow.id).single()
+          const stockBase = freshColor?.stock ?? colorRow.stock
+          color_id = colorRow.id
+          color_stock_nuevo = Math.max(0, stockBase + (tipoConfig.signo * cantidadNum))
+        }
+      }
+
+      await callMovimiento({
+        producto_id:     producto.id,
+        tipo,
+        qty_antes:       producto.stock_fisico,
+        qty_despues:     nuevoStockFinal,
+        notas:           notas || null,
+        color_variante:  colorSeleccionado || null,
+        proveedor_id:    finalProveedorId,
+        precio_unitario: esEntrada && precioUnitario ? parseFloat(precioUnitario) : null,
+        color_id,
+        color_stock_nuevo,
+      })
+
       onSuccess()
-      return
-    }
-
-    // ── SINGLE (sin colores o ajuste/devolución) ───────────────
-    const nuevoStockFinal = tipo === 'levantamiento_inventario'
-      ? cantidadNum
-      : producto.stock_fisico + (tipoConfig.signo * cantidadNum)
-
-    const { error: ledgerError } = await supabase.from('stock_ledger').insert({
-      producto_id:     producto.id,
-      tipo,
-      qty_antes:       producto.stock_fisico,
-      qty_despues:     nuevoStockFinal,
-      notas:           notas || null,
-      canal:           'manual',
-      usuario_id:      user?.id ?? null,
-      color_variante:  colorSeleccionado || null,
-      proveedor_id:    finalProveedorId,
-      precio_unitario: esEntrada && precioUnitario ? parseFloat(precioUnitario) : null,
-    })
-
-    if (ledgerError) {
-      setError('Error al registrar el movimiento. Intenta de nuevo.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar. Intenta de nuevo.')
       setLoading(false)
-      return
     }
-
-    const { error: updateError } = await supabase.from('productos')
-      .update({ stock_fisico: nuevoStockFinal }).eq('id', producto.id)
-
-    if (updateError) {
-      setError('Movimiento guardado pero error al actualizar stock. Recarga la página.')
-      setLoading(false)
-      return
-    }
-
-    if (colorSeleccionado) {
-      const colorRow = colores.find(c => c.nombre === colorSeleccionado)
-      if (colorRow) {
-        // C8: re-consultar stock actual desde DB para evitar calcular sobre prop stale
-        const { data: freshColor } = await supabase.from('producto_colores').select('stock').eq('id', colorRow.id).single()
-        const stockBase = freshColor?.stock ?? colorRow.stock
-        await supabase.from('producto_colores')
-          .update({ stock: Math.max(0, stockBase + (tipoConfig.signo * cantidadNum)) })
-          .eq('id', colorRow.id)
-      }
-    }
-
-    onSuccess()
   }
 
   return (
