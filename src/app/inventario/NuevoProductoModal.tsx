@@ -65,7 +65,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
     e.preventDefault()
     if (!form.nombre.trim()) { setError('El nombre es requerido'); return }
     if (!form.precio_menudeo || parseFloat(form.precio_menudeo) < 0) { setError('El precio menudeo debe ser mayor a 0'); return }
-    if (form.precio_caja && !form.piezas_por_caja) { setError('Indica cuántas piezas tiene cada caja'); return }
+    if (form.precio_caja && !form.piezas_por_caja) { setError(`Indica cuántas ${form.unidad} tiene cada caja`); return }
 
     setLoading(true)
     const supabase = createClient()
@@ -282,7 +282,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
           {form.precio_mayoreo && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Cantidad mínima para mayoreo <span className="font-normal text-slate-400">(pzas)</span>
+                Cantidad mínima para mayoreo <span className="font-normal text-slate-400">({form.unidad})</span>
               </label>
               <input
                 type="number"
@@ -294,7 +294,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
               />
               {form.piezas_por_caja && form.umbral_mayoreo && (
                 <p className="text-xs text-slate-400 mt-1">
-                  ≥ {form.umbral_mayoreo} pzas sueltas → precio mayoreo (independiente de cajas)
+                  ≥ {form.umbral_mayoreo} {form.unidad} sueltas → precio mayoreo (independiente de cajas)
                 </p>
               )}
             </div>
@@ -319,7 +319,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Piezas por caja</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">{form.unidad} por caja</label>
                 <input
                   type="number"
                   min="1"
@@ -473,7 +473,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
               <div className="space-y-2">
                 {coloresDraft.map((c, i) => {
                   const ppc         = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
-                  const unidadLabel = ppc > 0 ? form.unidad : 'pzas'
+                  const unidadLabel = form.unidad
                   const piezasTotal = ppc > 0 ? c.stock * ppc : c.stock
                   return (
                     <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -505,7 +505,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                           />
                           {ppc > 0 && c.stock > 0 && (
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                              = {formatNum(piezasTotal)} pzas
+                              = {formatNum(piezasTotal)} {form.unidad}
                             </p>
                           )}
                         </div>

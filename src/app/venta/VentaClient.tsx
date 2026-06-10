@@ -362,7 +362,7 @@ function AgregarProductoModal({
               <div className="flex items-center justify-between">
                 {tieneCaja && producto.piezas_por_caja ? (
                   <span className="text-xs text-slate-400 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                    1 caja = {formatNum(producto.piezas_por_caja)} pzas
+                    1 caja = {formatNum(producto.piezas_por_caja)} {producto.unidad === 'caja' ? 'pza' : producto.unidad}
                   </span>
                 ) : <span />}
                 <p className="text-xs text-slate-400 text-right">

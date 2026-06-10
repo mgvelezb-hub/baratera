@@ -206,7 +206,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
       setError('El precio menudeo debe ser mayor a 0'); return
     }
     if (form.precio_caja && !form.piezas_por_caja) {
-      setError('Indica cuántas piezas tiene cada caja'); return
+      setError(`Indica cuántas ${form.unidad} tiene cada caja`); return
     }
 
     setLoading(true)
@@ -406,7 +406,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               />
               {parseInt(form.piezas_por_caja) > 0 && parseInt(form.stock_minimo) > 0 && (
                 <p className="text-xs text-slate-400 mt-1">
-                  = {formatNum(parseInt(form.stock_minimo) * parseInt(form.piezas_por_caja))} pzas
+                  = {formatNum(parseInt(form.stock_minimo) * parseInt(form.piezas_por_caja))} {form.unidad}
                 </p>
               )}
             </div>
@@ -443,7 +443,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Cantidad mín. mayoreo <span className="font-normal text-slate-400">(pzas)</span>
+                Cantidad mín. mayoreo <span className="font-normal text-slate-400">({form.unidad})</span>
               </label>
               <input
                 type="number"
@@ -456,7 +456,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               />
               {parseInt(form.piezas_por_caja) > 0 && form.umbral_mayoreo && (
                 <p className="text-xs text-slate-400 mt-1">
-                  ≥ {form.umbral_mayoreo} pzas sueltas → precio mayoreo
+                  ≥ {form.umbral_mayoreo} {form.unidad} sueltas → precio mayoreo
                 </p>
               )}
             </div>
@@ -481,7 +481,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Piezas por caja</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">{form.unidad} por caja</label>
                 <input
                   type="number"
                   min="1"
@@ -494,7 +494,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
             </div>
             {form.precio_caja && form.piezas_por_caja && parseInt(form.piezas_por_caja) > 0 && (
               <p className="text-xs text-violet-600">
-                Precio por pieza (caja): {
+                Precio por {form.unidad} (caja): {
                   (parseFloat(form.precio_caja) / parseInt(form.piezas_por_caja)).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
                 } c/u
               </p>
@@ -615,7 +615,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                               />
                               {(colorStocksCajas[c.id] ?? 0) > 0 && (
                                 <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                                  = {formatNum((colorStocksCajas[c.id] ?? 0) * ppc)} pzas
+                                  = {formatNum((colorStocksCajas[c.id] ?? 0) * ppc)} {form.unidad}
                                 </p>
                               )}
                             </>
@@ -644,7 +644,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                           />
                           {ppc && (colorMins[c.id] ?? '') !== '' && parseInt(colorMins[c.id] ?? '0') > 0 && (
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                              = {formatNum(parseInt(colorMins[c.id] ?? '0') * ppc)} pzas
+                              = {formatNum(parseInt(colorMins[c.id] ?? '0') * ppc)} {form.unidad}
                             </p>
                           )}
                         </div>
