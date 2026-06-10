@@ -97,10 +97,11 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     setColorLoading(true)
     setColorError('')
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
     const ppc = parseInt(form.piezas_por_caja) || 0
     const stockMin = parseInt(nuevoMinGen) || parseInt(form.stock_minimo) || 5
     let stockActual = producto.stock_fisico
+    const colorMinChanges: { color_id: string; new_min: number | null }[] = []
+    const nuevosColores: typeof colores = []
 
     for (const nombre of Array.from(paletaSel)) {
       if (colores.some(c => c.nombre === nombre)) continue
@@ -111,11 +112,10 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
         .insert({ producto_id: producto.id, nombre, hex: info.hex, stock: nuevoStockGen })
         .select().single()
       if (err || !data) continue
-      // stock_minimo en UPDATE separado — convertido a piezas igual que stock
+
       const minPiezas = ppc > 0 ? stockMin * ppc : stockMin
-      if (minPiezas) {
-        await supabase.from('producto_colores').update({ stock_minimo: minPiezas }).eq('id', data.id)
-      }
+      if (minPiezas) colorMinChanges.push({ color_id: data.id, new_min: minPiezas })
+
       if (nuevoStockGen > 0) {
         const stockDespues = stockActual + nuevoStockGen
         await supabase.from('stock_ledger').insert({
@@ -125,18 +125,30 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
           qty_despues:    stockDespues,
           notas:          `Stock inicial color ${nombre}`,
           canal:          'manual',
-          usuario_id:     user?.id ?? null,
           color_variante: nombre,
         })
         stockActual = stockDespues
       }
-      setColores(prev => [...prev, data])
+      nuevosColores.push(data)
       setColorStocks(prev => ({ ...prev, [data.id]: nuevoStockGen }))
       setColorMins(prev => ({ ...prev, [data.id]: stockMin ? String(stockMin) : '' }))
     }
-    if (nuevoStockGen > 0) {
-      await supabase.from('productos').update({ stock_fisico: stockActual }).eq('id', producto.id)
+
+    // Actualizar stock_fisico y stock_minimo de colores via servidor (bypasa RLS)
+    if (nuevoStockGen > 0 || colorMinChanges.length > 0) {
+      await fetch('/api/inventario/producto', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          id:                producto.id,
+          fields:            {},
+          stockFisicoFinal:  nuevoStockGen > 0 ? stockActual : undefined,
+          colorMinChanges:   colorMinChanges.length > 0 ? colorMinChanges : undefined,
+        }),
+      })
     }
+
+    setColores(prev => [...prev, ...nuevosColores])
     setPaletaSel(new Set())
     setNuevoStockGen(0)
     setNuevoMinGen('')
@@ -151,10 +163,11 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
 
   async function saveColorEdit() {
     if (!editingColorId || !editColorNombre.trim()) return
-    await createClient()
-      .from('producto_colores')
-      .update({ nombre: editColorNombre.trim(), hex: editColorHex })
-      .eq('id', editingColorId)
+    await fetch('/api/inventario/producto', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ color_id: editingColorId, nombre: editColorNombre.trim(), hex: editColorHex }),
+    })
     setColores(prev => prev.map(c =>
       c.id === editingColorId ? { ...c, nombre: editColorNombre.trim(), hex: editColorHex } : c
     ))
@@ -197,73 +210,61 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     }
 
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const ppc = parseInt(form.piezas_por_caja) || 0
+    const ppc  = parseInt(form.piezas_por_caja) || 0
+    const ppc2 = ppc
 
-    const { error: updateError } = await supabase
-      .from('productos')
-      .update({
-        nombre:          form.nombre.trim(),
-        sku:             form.sku.trim() || null,
-        descripcion:     form.descripcion.trim() || null,
-        categoria:       form.categoria || null,
-        subcategoria:    form.subcategoria.trim() || null,
-        unidad:          form.unidad,
-        precio_menudeo:  parseFloat(form.precio_menudeo),
-        precio_mayoreo:  form.precio_mayoreo  ? parseFloat(form.precio_mayoreo)  : null,
-        umbral_mayoreo:  form.umbral_mayoreo  ? parseInt(form.umbral_mayoreo)    : null,
-        precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
-        piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
-        stock_minimo:    ((parseInt(form.stock_minimo) || 5)) * (ppc > 0 ? ppc : 1),
+    // Cambios de stock por color
+    const coloresConCambio = colores.filter(c => (colorStocks[c.id] ?? c.stock) !== c.stock)
+    const colorStockChanges = coloresConCambio.map(c => ({
+      color_id:   c.id,
+      color_nombre: c.nombre,
+      old_stock:  c.stock,
+      new_stock:  colorStocks[c.id] ?? c.stock,
+    }))
+    const stockFisicoFinal = coloresConCambio.length > 0
+      ? colores.reduce((acc, c) => acc + (colorStocks[c.id] ?? c.stock), 0)
+      : undefined
+
+    // Cambios de stock_minimo por color
+    const colorMinChanges = colores
+      .map(c => {
+        const cajasUI = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) : null
+        const newMin  = cajasUI !== null ? (ppc2 > 0 ? cajasUI * ppc2 : cajasUI) : null
+        return (newMin !== (c.stock_minimo ?? null)) ? { color_id: c.id, new_min: newMin } : null
       })
-      .eq('id', producto.id)
+      .filter(Boolean) as { color_id: string; new_min: number | null }[]
 
-    if (updateError) {
-      setError('Error al guardar. Verifica que el SKU no esté repetido.')
+    const res = await fetch('/api/inventario/producto', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        id:                 producto.id,
+        fields: {
+          nombre:          form.nombre.trim(),
+          sku:             form.sku.trim() || null,
+          descripcion:     form.descripcion.trim() || null,
+          categoria:       form.categoria || null,
+          subcategoria:    form.subcategoria.trim() || null,
+          unidad:          form.unidad,
+          precio_menudeo:  parseFloat(form.precio_menudeo),
+          precio_mayoreo:  form.precio_mayoreo  ? parseFloat(form.precio_mayoreo)  : null,
+          umbral_mayoreo:  form.umbral_mayoreo  ? parseInt(form.umbral_mayoreo)    : null,
+          precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
+          piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
+          stock_minimo:    (parseInt(form.stock_minimo) || 5) * (ppc > 0 ? ppc : 1),
+        },
+        colorStockChanges:  colorStockChanges.length  > 0 ? colorStockChanges  : undefined,
+        currentStockFisico: producto.stock_fisico,
+        stockFisicoFinal,
+        colorMinChanges:    colorMinChanges.length > 0 ? colorMinChanges : undefined,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setError(err.error ?? 'Error al guardar. Verifica que el SKU no esté repetido.')
       setLoading(false)
       return
-    }
-
-    // ── Cambios de stock por color (crea entradas en ledger) ──
-    const coloresConCambio = colores.filter(c => (colorStocks[c.id] ?? c.stock) !== c.stock)
-    if (coloresConCambio.length > 0) {
-      let stockActual = producto.stock_fisico
-      for (const c of coloresConCambio) {
-        const nuevoStock  = colorStocks[c.id] ?? c.stock
-        const delta       = nuevoStock - c.stock
-        const tipo        = delta > 0 ? 'ajuste_positivo' : 'ajuste_negativo'
-        const stockDespues = stockActual + delta
-
-        await supabase.from('stock_ledger').insert({
-          producto_id:    producto.id,
-          tipo,
-          qty_antes:      stockActual,
-          qty_despues:    stockDespues,
-          notas:          `Ajuste manual color ${c.nombre}`,
-          canal:          'manual',
-          usuario_id:     user?.id ?? null,
-          color_variante: c.nombre,
-        })
-        await supabase.from('producto_colores').update({ stock: nuevoStock }).eq('id', c.id)
-        stockActual = stockDespues
-      }
-      // stock_fisico = suma de todos los colores
-      const nuevoStockFisico = colores.reduce(
-        (acc, c) => acc + (colorStocks[c.id] ?? c.stock), 0
-      )
-      await supabase.from('productos').update({ stock_fisico: nuevoStockFisico }).eq('id', producto.id)
-    }
-
-    // ── Cambios de stock_minimo por color (colorMins en cajas, DB en piezas)
-    const ppc2 = parseInt(form.piezas_por_caja) || 0
-    for (const c of colores) {
-      const cajasUI = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) : null
-      const newMin  = cajasUI !== null ? (ppc2 > 0 ? cajasUI * ppc2 : cajasUI) : null
-      const oldMin  = c.stock_minimo ?? null
-      if (newMin !== oldMin) {
-        await supabase.from('producto_colores').update({ stock_minimo: newMin }).eq('id', c.id)
-      }
     }
 
     onSuccess()
@@ -271,15 +272,21 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
 
   async function handleDesactivar() {
     setDangerLoading(true)
-    await createClient().from('productos').update({ activo: false }).eq('id', producto.id)
+    await fetch('/api/inventario/producto', {
+      method:  'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: producto.id, action: 'deactivate' }),
+    })
     onSuccess()
   }
 
   async function handleEliminar() {
     setDangerLoading(true)
-    const supabase = createClient()
-    await supabase.from('stock_ledger').delete().eq('producto_id', producto.id)
-    await supabase.from('productos').delete().eq('id', producto.id)
+    await fetch('/api/inventario/producto', {
+      method:  'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: producto.id, action: 'delete' }),
+    })
     onSuccess()
   }
 
