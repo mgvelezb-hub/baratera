@@ -14,7 +14,8 @@ interface Props {
 
 export default function ProductoDetailClient({ producto }: Props) {
   const router = useRouter()
-  const { isAdmin, canEntrada, showCostos } = useIsAdmin()
+  const { can, canEntrada, showCostos } = useIsAdmin()
+  const canAjuste = can('inventario.ajuste')
   const [modalTipo, setModalTipo] = useState<'entrada_compra' | 'ajuste_positivo' | null>(null)
 
   function handleMovimientoSuccess() {
@@ -25,8 +26,8 @@ export default function ProductoDetailClient({ producto }: Props) {
   return (
     <>
       {/* ── Movement actions ─────────────────────────────── */}
-      {(canEntrada || isAdmin) && (
-        <div className={`grid gap-2 ${canEntrada && isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      {(canEntrada || canAjuste) && (
+        <div className={`grid gap-2 ${canEntrada && canAjuste ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {canEntrada && (
             <button
               onClick={() => setModalTipo('entrada_compra')}
@@ -36,7 +37,7 @@ export default function ProductoDetailClient({ producto }: Props) {
               Entrada
             </button>
           )}
-          {isAdmin && (
+          {canAjuste && (
             <button
               onClick={() => setModalTipo('ajuste_positivo')}
               className="h-12 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors"

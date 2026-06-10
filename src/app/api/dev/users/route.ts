@@ -42,12 +42,22 @@ export async function PATCH(req: NextRequest) {
   const { userId, role } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
-  const ROLES_VALIDOS = ['developer', 'admin', 'encargado', 'cajero', null]
-  if (!ROLES_VALIDOS.includes(role)) {
-    return NextResponse.json({ error: 'Rol inválido. Usa: developer|admin|encargado|cajero|null' }, { status: 400 })
-  }
-
   const admin = createAdminClient()
+
+  // Validar contra la tabla de roles dinámicos; fallback a la lista legacy
+  // si la migración aún no corre en Supabase.
+  if (role !== null) {
+    const { data: roleRow, error: roleError } = await admin
+      .from('roles')
+      .select('nombre')
+      .eq('nombre', role)
+      .maybeSingle()
+
+    const legacyOk = ['developer', 'admin', 'encargado', 'cajero'].includes(role)
+    if (roleError ? !legacyOk : !roleRow) {
+      return NextResponse.json({ error: `El perfil "${role}" no existe` }, { status: 400 })
+    }
+  }
   const newMeta = role ? { role } : {}
   const { error } = await admin.auth.admin.updateUserById(userId, { app_metadata: newMeta })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

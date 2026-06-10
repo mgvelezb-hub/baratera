@@ -12,22 +12,24 @@ import { createClient } from '@/lib/supabase/client'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { cn } from '@/lib/utils'
 
+// permiso: clave del catálogo (src/lib/permisos.ts) que habilita el módulo.
+// devOnly: visible solo para el rol developer (no configurable por permisos).
 const MODULES = [
-  { id: 'inventario',      label: 'Inventario',      href: '/inventario',      icon: Package,      built: true,  adminOnly: false, devOnly: false },
-  { id: 'venta',           label: 'Venta física',    href: '/venta',           icon: ShoppingCart, built: true,  adminOnly: false, devOnly: false },
-  { id: 'corte',           label: 'Corte de caja',   href: '/corte',           icon: Scissors,     built: true,  adminOnly: true,  devOnly: false },
-  { id: 'proveedores',     label: 'Proveedores',     href: '/proveedores',     icon: Building2,    built: true,  adminOnly: true,  devOnly: false },
-  { id: 'costos',          label: 'Costos',          href: '/costos',          icon: Receipt,      built: true,  adminOnly: true,  devOnly: false },
-  { id: 'dashboard',       label: 'Dashboard',       href: '/dashboard',       icon: BarChart3,    built: true,  adminOnly: true,  devOnly: false },
-  { id: 'pedidos',         label: 'Pedidos',         href: '/pedidos',         icon: ClipboardList,built: false, adminOnly: true,  devOnly: false },
-  { id: 'clientes',        label: 'Clientes',        href: '/clientes',        icon: Users,        built: false, adminOnly: true,  devOnly: false },
-  { id: 'configuraciones', label: 'Configuraciones', href: '/configuraciones', icon: Settings,     built: true,  adminOnly: false, devOnly: true  },
+  { id: 'inventario',      label: 'Inventario',      href: '/inventario',      icon: Package,      built: true,  permiso: 'inventario.ver',  devOnly: false },
+  { id: 'venta',           label: 'Venta física',    href: '/venta',           icon: ShoppingCart, built: true,  permiso: 'venta.pos',       devOnly: false },
+  { id: 'corte',           label: 'Corte de caja',   href: '/corte',           icon: Scissors,     built: true,  permiso: 'corte.ver',       devOnly: false },
+  { id: 'proveedores',     label: 'Proveedores',     href: '/proveedores',     icon: Building2,    built: true,  permiso: 'proveedores.ver', devOnly: false },
+  { id: 'costos',          label: 'Costos',          href: '/costos',          icon: Receipt,      built: true,  permiso: 'costos.ver',      devOnly: false },
+  { id: 'dashboard',       label: 'Dashboard',       href: '/dashboard',       icon: BarChart3,    built: true,  permiso: 'dashboard.ver',   devOnly: false },
+  { id: 'pedidos',         label: 'Pedidos',         href: '/pedidos',         icon: ClipboardList,built: false, permiso: 'dashboard.ver',   devOnly: false },
+  { id: 'clientes',        label: 'Clientes',        href: '/clientes',        icon: Users,        built: false, permiso: 'dashboard.ver',   devOnly: false },
+  { id: 'configuraciones', label: 'Configuraciones', href: '/configuraciones', icon: Settings,     built: true,  permiso: '',                devOnly: true  },
 ]
 
 function NavContent({ onClose }: { onClose?: () => void }) {
   const pathname      = usePathname()
   const router        = useRouter()
-  const { isAdmin, isDeveloper } = useIsAdmin()
+  const { can, isDeveloper } = useIsAdmin()
 
   async function handleLogout() {
     await createClient().auth.signOut()
@@ -39,9 +41,8 @@ function NavContent({ onClose }: { onClose?: () => void }) {
     <>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {MODULES.filter(mod => {
-          if (mod.devOnly)   return isDeveloper
-          if (mod.adminOnly) return isAdmin
-          return true
+          if (mod.devOnly) return isDeveloper
+          return can(mod.permiso)
         }).map(mod => {
           const Icon     = mod.icon
           const isActive = pathname.startsWith(mod.href)

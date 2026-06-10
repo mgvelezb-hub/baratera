@@ -18,7 +18,9 @@ export default function InventarioClient() {
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroSemaforo>('todos')
   const [showNuevo, setShowNuevo] = useState(false)
-  const { isAdmin, canEntrada, showCostos } = useIsAdmin()
+  const { can, canEntrada, showCostos } = useIsAdmin()
+  const canAgregar = can('inventario.agregar')
+  const canEditar  = can('inventario.editar')
 
   const fetchProductos = useCallback(async () => {
     const supabase = createClient()
@@ -65,7 +67,7 @@ export default function InventarioClient() {
           <h1 className="text-xl font-semibold text-slate-900">Inventario</h1>
           <p className="text-sm text-slate-500 mt-0.5">{productos.length} productos</p>
         </div>
-        {canEntrada && (
+        {canAgregar && (
           <button
             onClick={() => setShowNuevo(true)}
             className="h-10 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
@@ -169,7 +171,7 @@ export default function InventarioClient() {
               key={producto.id}
               producto={producto}
               colores={coloresMap.get(producto.id) ?? []}
-              isAdmin={isAdmin}
+              isAdmin={canEditar}
               canEntrada={canEntrada}
               showCostos={showCostos}
               onRefresh={fetchProductos}

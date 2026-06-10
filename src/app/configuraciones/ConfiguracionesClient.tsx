@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Users, Database, Monitor, RefreshCw,
   Trash2, AlertTriangle, CheckCircle2, Loader2, Shield,
-  Activity, Server,
+  Activity, Server, KeyRound,
 } from 'lucide-react'
+import RolesTab, { type RoleRow } from './RolesTab'
+import { invalidateRoleCache } from '@/lib/hooks/useIsAdmin'
 
 // ── Types ──────────────────────────────────────────────────────
 interface UserInfo {
@@ -24,7 +26,7 @@ interface Stats {
   url:       string
 }
 
-type Tab = 'usuarios' | 'datos' | 'sistema'
+type Tab = 'usuarios' | 'perfiles' | 'datos' | 'sistema'
 
 // ── Constants ──────────────────────────────────────────────────
 const ROLE_META: Record<string, { label: string; color: string }> = {
@@ -74,6 +76,10 @@ export default function ConfiguracionesClient() {
   const [resetLoading,  setResetLoading]  = useState(false)
   const [resetResult,   setResetResult]   = useState<Record<string, string> | null>(null)
 
+  const [roles,            setRoles]            = useState<RoleRow[]>([])
+  const [roleUserCounts,   setRoleUserCounts]   = useState<Record<string, number>>({})
+  const [migrationPending, setMigrationPending] = useState(false)
+
   // ── Bootstrap ──────────────────────────────────────────────────
   useEffect(() => {
     setSimRole(localStorage.getItem('devSimRole') ?? '')
@@ -93,6 +99,20 @@ export default function ConfiguracionesClient() {
   }, [])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
+
+  // ── Fetch roles ───────────────────────────────────────────────
+  const fetchRoles = useCallback(async () => {
+    const res = await fetch('/api/dev/roles')
+    if (res.ok) {
+      const data = await res.json()
+      setRoles(data.roles ?? [])
+      setRoleUserCounts(data.userCounts ?? {})
+      setMigrationPending(data.migrationPending === true)
+      invalidateRoleCache()
+    }
+  }, [])
+
+  useEffect(() => { fetchRoles() }, [fetchRoles])
 
   // ── Fetch stats ───────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
@@ -148,6 +168,7 @@ export default function ConfiguracionesClient() {
     setSimRole(r)
     if (r) localStorage.setItem('devSimRole', r)
     else   localStorage.removeItem('devSimRole')
+    invalidateRoleCache()
     showToast(
       r ? `Simulando como ${r} — recarga para ver efecto` : 'Simulación desactivada — recarga',
       true,
@@ -205,9 +226,10 @@ export default function ConfiguracionesClient() {
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6">
         {([
-          { id: 'usuarios', label: 'Usuarios',  Icon: Users    },
-          { id: 'datos',    label: 'Datos',     Icon: Database },
-          { id: 'sistema',  label: 'Sistema',   Icon: Monitor  },
+          { id: 'usuarios', label: 'Usuarios', Icon: Users    },
+          { id: 'perfiles', label: 'Perfiles', Icon: KeyRound },
+          { id: 'datos',    label: 'Datos',    Icon: Database },
+          { id: 'sistema',  label: 'Sistema',  Icon: Monitor  },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -245,7 +267,12 @@ export default function ConfiguracionesClient() {
           ) : (
             <div className="space-y-2">
               {users.map(u => {
-                const meta = ROLE_META[u.role ?? '']
+                const meta = ROLE_META[u.role ?? ''] ?? (u.role
+                  ? {
+                      label: roles.find(r => r.nombre === u.role)?.etiqueta ?? u.role,
+                      color: 'bg-emerald-100 text-emerald-700',
+                    }
+                  : null)
                 const initial = (u.email ?? '?')[0].toUpperCase()
                 const lastSeen = u.lastSignIn
                   ? new Date(u.lastSignIn).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
@@ -282,10 +309,9 @@ export default function ConfiguracionesClient() {
                           className="h-8 pl-2 pr-7 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white cursor-pointer"
                         >
                           <option value="">Sin rol</option>
-                          <option value="cajero">Cajero</option>
-                          <option value="encargado">Encargado</option>
-                          <option value="admin">Admin</option>
-                          <option value="developer">Developer</option>
+                          {roles.map(r => (
+                            <option key={r.nombre} value={r.nombre}>{r.etiqueta}</option>
+                          ))}
                         </select>
                       )}
                     </div>
@@ -295,6 +321,17 @@ export default function ConfiguracionesClient() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── TAB PERFILES ─────────────────────────────────────────── */}
+      {tab === 'perfiles' && (
+        <RolesTab
+          roles={roles}
+          userCounts={roleUserCounts}
+          migrationPending={migrationPending}
+          onChanged={fetchRoles}
+          showToast={showToast}
+        />
       )}
 
       {/* ── TAB DATOS ────────────────────────────────────────────── */}
@@ -476,10 +513,10 @@ export default function ConfiguracionesClient() {
             </p>
             <div className="flex gap-2 flex-wrap">
               {[
-                { value: '',          label: 'Sin simulación' },
-                { value: 'cajero',    label: 'Cajero'         },
-                { value: 'encargado', label: 'Encargado'      },
-                { value: 'admin',     label: 'Admin'          },
+                { value: '', label: 'Sin simulación' },
+                ...roles
+                  .filter(r => r.nombre !== 'developer')
+                  .map(r => ({ value: r.nombre, label: r.etiqueta })),
               ].map(({ value, label }) => (
                 <button
                   key={value || 'none'}
