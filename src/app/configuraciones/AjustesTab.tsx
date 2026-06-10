@@ -67,12 +67,13 @@ function SaveButton({ onClick, saving, dirty }: { onClick: () => void; saving: b
 }
 
 export default function AjustesTab({ config, migrationPending, onSaved, showToast }: Props) {
-  const [negocio,  setNegocio]  = useState(config.negocio)
-  const [alertas,  setAlertas]  = useState(config.alertas)
-  const [inv,      setInv]      = useState(config.inventario)
-  const [mant,     setMant]     = useState(config.mantenimiento)
-  const [saving,   setSaving]   = useState<string | null>(null)
-  const [nuevaCat, setNuevaCat] = useState('')
+  const [negocio,     setNegocio]     = useState(config.negocio)
+  const [alertas,     setAlertas]     = useState(config.alertas)
+  const [inv,         setInv]         = useState(config.inventario)
+  const [mant,        setMant]        = useState(config.mantenimiento)
+  const [saving,      setSaving]      = useState<string | null>(null)
+  const [nuevaCat,    setNuevaCat]    = useState('')
+  const [nuevaSubcat, setNuevaSubcat] = useState('')
 
   // Re-sincronizar cuando el padre recarga la config
   useEffect(() => { setNegocio(config.negocio) },       [config.negocio])
@@ -185,6 +186,52 @@ export default function AjustesTab({ config, migrationPending, onSaved, showToas
               if (nuevaCat.trim() && !inv.categorias.includes(nuevaCat.trim())) {
                 setInv({ ...inv, categorias: [...inv.categorias, nuevaCat.trim()] })
                 setNuevaCat('')
+              }
+            }}
+            className="h-8 px-2.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Subcategorías */}
+        <p className="text-xs font-medium text-slate-500 mb-1.5 mt-2">Subcategorías</p>
+        <p className="text-xs text-slate-400 mb-2">Contenido/variante del producto (ej: "100 hojas", "25 piezas"). Aparecen como filtro en el POS.</p>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {(inv.subcategorias ?? []).map(sub => (
+            <span key={sub} className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full">
+              {sub}
+              <button
+                onClick={() => setInv({ ...inv, subcategorias: (inv.subcategorias ?? []).filter(s => s !== sub) })}
+                className="text-blue-400 hover:text-red-500"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            value={nuevaSubcat}
+            onChange={e => setNuevaSubcat(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && nuevaSubcat.trim()) {
+                e.preventDefault()
+                if (!(inv.subcategorias ?? []).includes(nuevaSubcat.trim())) {
+                  setInv({ ...inv, subcategorias: [...(inv.subcategorias ?? []), nuevaSubcat.trim()] })
+                }
+                setNuevaSubcat('')
+              }
+            }}
+            placeholder="Nueva subcategoría + Enter"
+            className="h-8 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 w-52"
+          />
+          <button
+            onClick={() => {
+              if (nuevaSubcat.trim() && !(inv.subcategorias ?? []).includes(nuevaSubcat.trim())) {
+                setInv({ ...inv, subcategorias: [...(inv.subcategorias ?? []), nuevaSubcat.trim()] })
+                setNuevaSubcat('')
               }
             }}
             className="h-8 px-2.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"

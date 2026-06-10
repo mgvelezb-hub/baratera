@@ -9,10 +9,10 @@ import {
 interface FilaImportada {
   nombre:            string
   color?:            string
+  subcategoria?:     string
   existencia_cajas:  number
   existencia_piezas: number
   piezas_por_caja?:  number
-  contenido_paquete?: number
   precio_menudeo:    number
   precio_mayoreo?:   number
   precio_caja?:      number
@@ -26,10 +26,12 @@ interface Resultado {
 const HEADER_MAP: Record<string, keyof FilaImportada> = {
   'producto':              'nombre',
   'color':                 'color',
+  'contenido por paquete': 'subcategoria',
+  'subcategoria':          'subcategoria',
+  'subcategoría':          'subcategoria',
   'existencia de cajas':   'existencia_cajas',
   'existencia de piezas':  'existencia_piezas',
   'piezas por caja':       'piezas_por_caja',
-  'contenido por paquete': 'contenido_paquete',
   'precio menudeo':        'precio_menudeo',
   'precio mayoreo':        'precio_mayoreo',
   'precio caja':           'precio_caja',
@@ -65,11 +67,11 @@ async function parseExcel(file: File): Promise<FilaImportada[]> {
       if (!m.nombre || !String(m.nombre).trim()) return null
       return {
         nombre:            String(m.nombre).trim(),
-        color:             m.color ? String(m.color).trim() || undefined : undefined,
+        color:             m.color        ? String(m.color).trim()        || undefined : undefined,
+        subcategoria:      m.subcategoria ? String(m.subcategoria).trim() || undefined : undefined,
         existencia_cajas:  toNum(m.existencia_cajas),
         existencia_piezas: toNum(m.existencia_piezas),
         piezas_por_caja:   toNum(m.piezas_por_caja)  || undefined,
-        contenido_paquete: toNum(m.contenido_paquete) || undefined,
         precio_menudeo:    toNum(m.precio_menudeo),
         precio_mayoreo:    toNum(m.precio_mayoreo)    || undefined,
         precio_caja:       toNum(m.precio_caja)       || undefined,
@@ -264,7 +266,7 @@ export default function ImportarTab({ showToast }: Props) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  {['Producto', 'Color', 'Cajas', 'Piezas', 'Pzas/caja', 'Cont/paq', 'Menudeo', 'Mayoreo', 'Caja'].map(h => (
+                  {['Producto', 'Color', 'Subcategoría', 'Cajas', 'Piezas', 'Pzas/caja', 'Menudeo', 'Mayoreo', 'Caja'].map(h => (
                     <th key={h} className="px-3 py-2 text-left font-semibold text-slate-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -272,12 +274,12 @@ export default function ImportarTab({ showToast }: Props) {
               <tbody className="divide-y divide-slate-100">
                 {preview.map((f, i) => (
                   <tr key={i} className="hover:bg-slate-50">
-                    <td className="px-3 py-2 font-medium text-slate-800 max-w-[140px] truncate">{f.nombre}</td>
+                    <td className="px-3 py-2 font-medium text-slate-800 max-w-[120px] truncate">{f.nombre}</td>
                     <td className="px-3 py-2 text-slate-500">{f.color ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-500 max-w-[100px] truncate">{f.subcategoria ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-500 text-right">{f.existencia_cajas || '—'}</td>
                     <td className="px-3 py-2 text-slate-500 text-right">{f.existencia_piezas || '—'}</td>
                     <td className="px-3 py-2 text-slate-500 text-right">{f.piezas_por_caja ?? '—'}</td>
-                    <td className="px-3 py-2 text-slate-500 text-right">{f.contenido_paquete ?? '—'}</td>
                     <td className="px-3 py-2 text-right font-medium text-slate-700">{formatMXN(f.precio_menudeo)}</td>
                     <td className="px-3 py-2 text-right text-slate-500">{f.precio_mayoreo ? formatMXN(f.precio_mayoreo) : '—'}</td>
                     <td className="px-3 py-2 text-right text-slate-500">{f.precio_caja ? formatMXN(f.precio_caja) : '—'}</td>

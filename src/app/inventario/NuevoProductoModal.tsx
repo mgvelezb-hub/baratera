@@ -44,10 +44,11 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
     umbral_mayoreo: '',
     precio_caja: '',
     piezas_por_caja: '',
-    stock_fisico: '0',
-    stock_minimo: '5',
-    unidad: 'pza',
-    categoria: '',
+    stock_fisico:  '0',
+    stock_minimo:  '5',
+    unidad:        'pza',
+    categoria:     '',
+    subcategoria:  '',
   })
 
   useEffect(() => {
@@ -89,9 +90,11 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
     const { data: producto, error: insertError } = await supabase
       .from('productos')
       .insert({
-        nombre: form.nombre.trim(),
-        sku: form.sku.trim() || null,
-        descripcion: form.descripcion.trim() || null,
+        nombre:          form.nombre.trim(),
+        sku:             form.sku.trim() || null,
+        descripcion:     form.descripcion.trim() || null,
+        categoria:       form.categoria || null,
+        subcategoria:    form.subcategoria.trim() || null,
         precio_menudeo:  parseFloat(form.precio_menudeo),
         precio_mayoreo:  form.precio_mayoreo  ? parseFloat(form.precio_mayoreo)  : null,
         umbral_mayoreo:  form.umbral_mayoreo  ? parseInt(form.umbral_mayoreo)    : null,
@@ -100,7 +103,6 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
         stock_fisico: stockInicial,
         stock_minimo: ((parseInt(form.stock_minimo) || 5)) * (ppc > 0 ? ppc : 1),
         unidad: form.unidad,
-        categoria: form.categoria || null,
       })
       .select()
       .single()
@@ -197,14 +199,53 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Categoría</label>
+              <div className="flex gap-1.5">
+                <select
+                  value={CATEGORIAS.includes(form.categoria) ? form.categoria : ''}
+                  onChange={e => set('categoria', e.target.value)}
+                  className="flex-1 h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                >
+                  <option value="">Sin categoría</option>
+                  {CATEGORIAS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  {form.categoria && !CATEGORIAS.includes(form.categoria) && (
+                    <option value={form.categoria}>{form.categoria}</option>
+                  )}
+                </select>
+                <input
+                  type="text"
+                  value={CATEGORIAS.includes(form.categoria) ? '' : form.categoria}
+                  onChange={e => set('categoria', e.target.value)}
+                  placeholder="Nueva…"
+                  className="w-20 h-11 px-2 rounded-lg border border-dashed border-violet-300 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-violet-50 placeholder-violet-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Subcategoría */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Subcategoría <span className="font-normal text-slate-400">(ej: 100 hojas, 25 piezas)</span>
+            </label>
+            <div className="flex gap-1.5">
               <select
-                value={form.categoria}
-                onChange={e => set('categoria', e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                value={(config.inventario.subcategorias ?? []).includes(form.subcategoria) ? form.subcategoria : ''}
+                onChange={e => set('subcategoria', e.target.value)}
+                className="flex-1 h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
               >
-                <option value="">Sin categoría</option>
-                {CATEGORIAS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                <option value="">Sin subcategoría</option>
+                {(config.inventario.subcategorias ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+                {form.subcategoria && !(config.inventario.subcategorias ?? []).includes(form.subcategoria) && (
+                  <option value={form.subcategoria}>{form.subcategoria}</option>
+                )}
               </select>
+              <input
+                type="text"
+                value={(config.inventario.subcategorias ?? []).includes(form.subcategoria) ? '' : form.subcategoria}
+                onChange={e => set('subcategoria', e.target.value)}
+                placeholder="Nueva…"
+                className="w-20 h-11 px-2 rounded-lg border border-dashed border-violet-300 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-violet-50 placeholder-violet-300"
+              />
             </div>
           </div>
 

@@ -6,15 +6,16 @@ import { logAudit }          from '@/lib/audit'
 interface FilaImportada {
   nombre:            string
   color?:            string
+  subcategoria?:     string
   existencia_cajas:  number
   existencia_piezas: number
   piezas_por_caja?:  number
-  contenido_paquete?: number
   precio_menudeo:    number
   precio_mayoreo?:   number
   precio_caja?:      number
 }
 
+// ── Color hex dictionary (common Spanish names) ────────────────
 const COLOR_HEX: Record<string, string> = {
   rojo:      '#ef4444', azul:       '#3b82f6', verde:    '#22c55e',
   amarillo:  '#eab308', naranja:    '#f97316', morado:   '#a855f7',
@@ -27,6 +28,26 @@ const COLOR_HEX: Record<string, string> = {
 
 function hexColor(nombre: string): string {
   return COLOR_HEX[nombre.toLowerCase().trim()] ?? '#94a3b8'
+}
+
+// ── Auto-categorization by product name keywords ───────────────
+const CAT_KEYWORDS: Array<{ keys: string[]; cat: string }> = [
+  { keys: ['cuaderno', 'libreta', 'bloc', 'block', 'folder', 'carpeta'], cat: 'Cuadernos' },
+  { keys: ['lapiz', 'lápiz', 'lapices', 'lápices', 'pluma', 'boligrafo', 'bolígrafo', 'marcador', 'plumón', 'plumon', 'crayola', 'crayon', 'gis', 'sharpie', 'color'], cat: 'Escritura' },
+  { keys: ['corrector', 'tipex', 'borrador', 'liquid paper'], cat: 'Corrección' },
+  { keys: ['foamy', 'fomi', 'fomy', 'limpiapipas', 'estambre', 'pincel', 'pintura', 'acuarela', 'silicón', 'silicon', 'tijera', 'diamantina', 'glitter', 'brillantina', 'papel craft', 'papel crepe'], cat: 'Arte y manualidades' },
+  { keys: ['clips', 'grapa', 'grapas', 'post-it', 'cinta', 'pegamento', 'resistol', 'calculadora', 'sello', 'archivero', 'folder', 'sobre', 'engrapadora'], cat: 'Oficina' },
+  { keys: ['regla', 'compás', 'compas', 'escuadra', 'transportador', 'mochila', 'lonchera', 'geometría'], cat: 'Escolar' },
+  { keys: ['usb', 'cable', 'audifono', 'audífono', 'mouse', 'teclado', 'memoria', 'pila', 'bateria', 'batería'], cat: 'Tecnología' },
+  { keys: ['hojas', 'papel bond', 'resma', 'papel'], cat: 'Cuadernos' },
+]
+
+function autoCategorizar(nombre: string): string | null {
+  const lower = nombre.toLowerCase()
+  for (const { keys, cat } of CAT_KEYWORDS) {
+    if (keys.some(k => lower.includes(k))) return cat
+  }
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -43,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const admin    = createAdminClient()
-  const creados: string[]                              = []
+  const creados: string[]                                  = []
   const errores: Array<{ nombre: string; error: string }> = []
 
   // Group rows by product name
@@ -70,15 +91,17 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    const primera = rows[0]
-    const ppc = primera.piezas_por_caja || primera.contenido_paquete || null
+    const primera      = rows[0]
+    const ppc          = primera.piezas_por_caja || null
     const tieneColores = rows.some(f => f.color?.trim())
+    const subcategoria = primera.subcategoria?.trim() || null
+    const categoria    = autoCategorizar(nombre) ?? null
 
     // Calculate total stock in piezas
     let stockTotal = 0
     if (tieneColores) {
       for (const row of rows) {
-        const ppcR = row.piezas_por_caja || row.contenido_paquete || 0
+        const ppcR = row.piezas_por_caja || 0
         stockTotal += (row.existencia_cajas || 0) * ppcR + (row.existencia_piezas || 0)
       }
     } else {
@@ -90,6 +113,8 @@ export async function POST(req: NextRequest) {
       .from('productos')
       .insert({
         nombre,
+        categoria,
+        subcategoria,
         precio_menudeo:  primera.precio_menudeo,
         precio_mayoreo:  primera.precio_mayoreo  || null,
         precio_caja:     primera.precio_caja     || null,
@@ -111,18 +136,12 @@ export async function POST(req: NextRequest) {
       for (const row of rows) {
         const colorNombre = row.color?.trim()
         if (!colorNombre) continue
-        const ppcR        = row.piezas_por_caja || row.contenido_paquete || 0
+        const ppcR        = row.piezas_por_caja || 0
         const stockPiezas = (row.existencia_cajas || 0) * ppcR + (row.existencia_piezas || 0)
 
-        const { data: colorRow } = await admin
+        await admin
           .from('producto_colores')
           .insert({ producto_id: producto.id, nombre: colorNombre, hex: hexColor(colorNombre), stock: stockPiezas })
-          .select()
-          .single()
-
-        if (colorRow && colorRow.stock_minimo === undefined) {
-          await admin.from('producto_colores').update({ stock_minimo: null }).eq('id', colorRow.id)
-        }
 
         if (stockPiezas > 0) {
           await admin.from('stock_ledger').insert({
@@ -155,7 +174,11 @@ export async function POST(req: NextRequest) {
 
   await logAudit(
     'datos.importados',
-    { creados: creados.length, omitidos: errores.filter(e => e.error.includes('Ya existe')).length, errores: errores.filter(e => !e.error.includes('Ya existe')).length },
+    {
+      creados:  creados.length,
+      omitidos: errores.filter(e => e.error.includes('Ya existe')).length,
+      errores:  errores.filter(e => !e.error.includes('Ya existe')).length,
+    },
     user.email ?? undefined,
   )
 

@@ -38,23 +38,18 @@ function piezasReales(item: CartItem): number {
 }
 
 function subtotalItem(item: CartItem): number {
-  let total = 0
   const p = item.producto
-
-  if (item.cantidadCajas > 0) {
-    if (p.precio_caja) {
-      total += item.cantidadCajas * Number(p.precio_caja)
-    } else if (p.piezas_por_caja) {
-      // Sin precio_caja: cada caja vale piezas_por_caja × precio_menudeo
-      total += item.cantidadCajas * p.piezas_por_caja * Number(p.precio_menudeo)
-    }
+  const piezasTotal = piezasReales(item)
+  // Modo caja: si hay cajas Y precio_caja → tarifa por pieza (precio_caja/ppc) para TODAS las piezas
+  if (item.cantidadCajas > 0 && p.precio_caja && p.piezas_por_caja) {
+    return piezasTotal * (Number(p.precio_caja) / Number(p.piezas_por_caja))
   }
+  // Solo piezas sueltas: menudeo o mayoreo
   if (item.cantidadPiezas > 0) {
-    // Mayoreo en piezas aplica aunque también haya cajas en el ítem
-    const esMayoreo = p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo
-    total += item.cantidadPiezas * (esMayoreo ? Number(p.precio_mayoreo) : Number(p.precio_menudeo))
+    const esMayoreo = p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= Number(p.umbral_mayoreo)
+    return item.cantidadPiezas * (esMayoreo ? Number(p.precio_mayoreo) : Number(p.precio_menudeo))
   }
-  return total
+  return 0
 }
 
 function totalCarrito(items: CartItem[]): number {
@@ -74,18 +69,21 @@ function maxPiezas(item: CartItem): number {
 
 function ahorroDesglose(item: CartItem): { caja: number; mayoreo: number } {
   const p = item.producto
-  let caja = 0, mayoreo = 0
+  const piezasTotal = piezasReales(item)
+  // Modo caja: ahorro = lo que costarían a precio menudeo vs. precio caja prorrateado
   if (item.cantidadCajas > 0 && p.precio_caja && p.piezas_por_caja) {
-    caja = Math.max(0,
-      item.cantidadCajas * p.piezas_por_caja * Number(p.precio_menudeo) -
-      item.cantidadCajas * Number(p.precio_caja)
+    const caja = Math.max(0,
+      piezasTotal * Number(p.precio_menudeo) -
+      piezasTotal * (Number(p.precio_caja) / Number(p.piezas_por_caja))
     )
+    return { caja, mayoreo: 0 }
   }
-  // Mayoreo aplica a piezas aunque haya cajas en el ítem
-  if (p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= p.umbral_mayoreo) {
+  // Solo mayoreo en piezas sueltas
+  let mayoreo = 0
+  if (p.precio_mayoreo && p.umbral_mayoreo && item.cantidadPiezas >= Number(p.umbral_mayoreo)) {
     mayoreo = item.cantidadPiezas * (Number(p.precio_menudeo) - Number(p.precio_mayoreo))
   }
-  return { caja, mayoreo }
+  return { caja: 0, mayoreo }
 }
 
 function ahorroItem(item: CartItem): number {
@@ -289,6 +287,21 @@ function AgregarProductoModal({
     if (piezas > newMax) setPiezas(newMax)
   }
 
+  function handleSetPiezas(v: number) {
+    const ppc = producto.piezas_por_caja
+    if (ppc && v >= ppc) {
+      const cajaExtra = Math.floor(v / ppc)
+      const newCajas  = cajas + cajaExtra
+      const maxCajas  = tieneCaja ? Math.floor(stockDisp / ppc) : 0
+      if (newCajas <= maxCajas) {
+        setCajas(newCajas)
+        setPiezas(v % ppc)
+        return
+      }
+    }
+    setPiezas(Math.max(0, Math.min(v, maxPiezasN)))
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl">
@@ -363,7 +376,7 @@ function AgregarProductoModal({
               )}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">{tieneCaja ? 'Piezas' : 'Cantidad'}</span>
-                <Stepper value={piezas} max={maxPiezasN} onChange={setPiezas} color="slate" label={piezasLabel} />
+                <Stepper value={piezas} max={maxPiezasN} onChange={handleSetPiezas} color="slate" label={piezasLabel} />
               </div>
               <div className="flex items-center justify-between">
                 {tieneCaja && producto.piezas_por_caja ? (
@@ -618,6 +631,8 @@ export default function VentaClient() {
   const [coloresMap,     setColoresMap]     = useState<Map<string, ProductoColor[]>>(new Map())
   const [loading,        setLoading]        = useState(true)
   const [search,         setSearch]         = useState('')
+  const [catFiltro,      setCatFiltro]      = useState('')
+  const [subcatFiltro,   setSubcatFiltro]   = useState('')
   const [carrito,        setCarrito]        = useState<CartItem[]>([])
   const [agregarModalProd,setAgregarModalProd] = useState<Producto | null>(null)
   const [colorPresel,     setColorPresel]      = useState<ProductoColor | null>(null)
@@ -675,8 +690,25 @@ export default function VentaClient() {
 
   useEffect(() => { fetchProductos() }, [fetchProductos])
 
+  const categorias = useMemo(() => {
+    const cats = new Set(productos.map(p => p.categoria).filter(Boolean) as string[])
+    return Array.from(cats).sort()
+  }, [productos])
+
+  const subcategorias = useMemo(() => {
+    if (!catFiltro) return []
+    const subs = new Set(
+      productos
+        .filter(p => p.categoria === catFiltro && p.subcategoria)
+        .map(p => p.subcategoria as string)
+    )
+    return Array.from(subs).sort()
+  }, [productos, catFiltro])
+
   const productosFiltrados = useMemo(() =>
     productos.filter(p => {
+      if (catFiltro && p.categoria !== catFiltro) return false
+      if (subcatFiltro && p.subcategoria !== subcatFiltro) return false
       if (!search) return true
       const q = search.toLowerCase()
       return (
@@ -685,7 +717,7 @@ export default function VentaClient() {
         p.categoria?.toLowerCase().includes(q)
       )
     }),
-  [productos, search])
+  [productos, search, catFiltro, subcatFiltro])
 
   function itemEnCarrito(productoId: string, colorNombre?: string | null): CartItem | undefined {
     return carrito.find(i =>
@@ -764,14 +796,24 @@ export default function VentaClient() {
 
   function setCantidadPiezas(key: string, valor: number) {
     setCarrito(prev =>
-      prev
-        .map(i => {
-          if (cartKey(i) !== key) return i
-          const nueva = Math.max(0, Math.min(valor, maxPiezas(i)))
-          if (nueva === 0 && i.cantidadCajas === 0) return null
-          return { ...i, cantidadPiezas: nueva }
-        })
-        .filter(Boolean) as CartItem[]
+      prev.map(i => {
+        if (cartKey(i) !== key) return i
+        const ppc   = i.producto.piezas_por_caja
+        const stock = i.colorStock ?? i.producto.stock_fisico
+        let nuevasCajas  = i.cantidadCajas
+        let nuevasPiezas = Math.max(0, Math.min(valor, stock - nuevasCajas * (ppc ?? 0)))
+        // Auto-caja: si piezas acumuladas alcanzan una caja completa → convertir
+        if (ppc && nuevasPiezas >= ppc) {
+          const cajaExtra = Math.floor(nuevasPiezas / ppc)
+          const maxCajas  = Math.floor(stock / ppc)
+          if (nuevasCajas + cajaExtra <= maxCajas) {
+            nuevasCajas  += cajaExtra
+            nuevasPiezas  = nuevasPiezas % ppc
+          }
+        }
+        if (nuevasCajas === 0 && nuevasPiezas === 0) return null
+        return { ...i, cantidadCajas: nuevasCajas, cantidadPiezas: nuevasPiezas }
+      }).filter(Boolean) as CartItem[]
     )
   }
 
@@ -995,6 +1037,50 @@ export default function VentaClient() {
             </button>
           </div>
         </div>
+
+        {/* ── Filtros de categoría y subcategoría ── */}
+        {categorias.length > 0 && (
+          <div className="px-4 pb-2 border-b border-slate-100 space-y-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <button
+                onClick={() => { setCatFiltro(''); setSubcatFiltro('') }}
+                className={`h-7 px-3 rounded-full text-xs font-medium transition-colors ${
+                  !catFiltro ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todos
+              </button>
+              {categorias.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => { setCatFiltro(cat === catFiltro ? '' : cat); setSubcatFiltro('') }}
+                  className={`h-7 px-3 rounded-full text-xs font-medium transition-colors ${
+                    catFiltro === cat ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {subcategorias.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {subcategorias.map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setSubcatFiltro(sub === subcatFiltro ? '' : sub)}
+                    className={`h-6 px-2.5 rounded-full text-xs transition-colors ${
+                      subcatFiltro === sub
+                        ? 'bg-amber-500 text-white font-medium'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {loading ? (

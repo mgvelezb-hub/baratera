@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Loader2, Trash2, AlertOctagon, Plus } from 'lucide-react'
+import { X, Loader2, Trash2, AlertOctagon, Plus, Pencil, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useConfig } from '@/lib/hooks/useConfig'
 import { CONFIG_DEFAULTS } from '@/lib/config'
@@ -41,6 +41,9 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   const [colorStocksCajas, setColorStocksCajas] = useState<Record<string, number>>({})
   const [colorLoading,     setColorLoading]    = useState(false)
   const [colorError,       setColorError]      = useState('')
+  const [editingColorId,   setEditingColorId]  = useState<string | null>(null)
+  const [editColorNombre,  setEditColorNombre] = useState('')
+  const [editColorHex,     setEditColorHex]    = useState('')
 
   useEffect(() => {
     createClient()
@@ -146,11 +149,24 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     setColores(prev => prev.filter(c => c.id !== color.id))
   }
 
+  async function saveColorEdit() {
+    if (!editingColorId || !editColorNombre.trim()) return
+    await createClient()
+      .from('producto_colores')
+      .update({ nombre: editColorNombre.trim(), hex: editColorHex })
+      .eq('id', editingColorId)
+    setColores(prev => prev.map(c =>
+      c.id === editingColorId ? { ...c, nombre: editColorNombre.trim(), hex: editColorHex } : c
+    ))
+    setEditingColorId(null)
+  }
+
   const [form, setForm] = useState({
     nombre:          producto.nombre,
     sku:             producto.sku ?? '',
     descripcion:     producto.descripcion ?? '',
     categoria:       producto.categoria ?? '',
+    subcategoria:    (producto as unknown as Record<string, string | null>).subcategoria ?? '',
     unidad:          producto.unidad,
     precio_menudeo:  String(producto.precio_menudeo),
     precio_mayoreo:  producto.precio_mayoreo ? String(producto.precio_mayoreo) : '',
@@ -192,6 +208,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
         sku:             form.sku.trim() || null,
         descripcion:     form.descripcion.trim() || null,
         categoria:       form.categoria || null,
+        subcategoria:    form.subcategoria.trim() || null,
         unidad:          form.unidad,
         precio_menudeo:  parseFloat(form.precio_menudeo),
         precio_mayoreo:  form.precio_mayoreo  ? parseFloat(form.precio_mayoreo)  : null,
@@ -307,14 +324,53 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Categoría</label>
+              <div className="flex gap-1.5">
+                <select
+                  value={CATEGORIAS.includes(form.categoria) ? form.categoria : ''}
+                  onChange={e => set('categoria', e.target.value)}
+                  className="flex-1 h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                >
+                  <option value="">Sin categoría</option>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {form.categoria && !CATEGORIAS.includes(form.categoria) && (
+                    <option value={form.categoria}>{form.categoria}</option>
+                  )}
+                </select>
+                <input
+                  type="text"
+                  value={CATEGORIAS.includes(form.categoria) ? '' : form.categoria}
+                  onChange={e => set('categoria', e.target.value)}
+                  placeholder="Nueva…"
+                  className="w-20 h-11 px-2 rounded-lg border border-dashed border-violet-300 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-violet-50 placeholder-violet-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Subcategoría */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Subcategoría <span className="font-normal text-slate-400">(ej: 100 hojas, 25 piezas)</span>
+            </label>
+            <div className="flex gap-1.5">
               <select
-                value={form.categoria}
-                onChange={e => set('categoria', e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+                value={(config.inventario.subcategorias ?? []).includes(form.subcategoria) ? form.subcategoria : ''}
+                onChange={e => set('subcategoria', e.target.value)}
+                className="flex-1 h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
               >
-                <option value="">Sin categoría</option>
-                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">Sin subcategoría</option>
+                {(config.inventario.subcategorias ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+                {form.subcategoria && !(config.inventario.subcategorias ?? []).includes(form.subcategoria) && (
+                  <option value={form.subcategoria}>{form.subcategoria}</option>
+                )}
               </select>
+              <input
+                type="text"
+                value={(config.inventario.subcategorias ?? []).includes(form.subcategoria) ? '' : form.subcategoria}
+                onChange={e => set('subcategoria', e.target.value)}
+                placeholder="Nueva…"
+                className="w-20 h-11 px-2 rounded-lg border border-dashed border-violet-300 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-violet-50 placeholder-violet-300"
+              />
             </div>
           </div>
 
@@ -470,22 +526,69 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                     <div key={c.id} className={`rounded-xl border p-3 transition-colors ${
                       delta !== 0 ? 'border-violet-200 bg-violet-50' : 'border-slate-200 bg-slate-50'
                     }`}>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
-                          <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
-                          {delta !== 0 && (
-                            <span className={`text-xs font-semibold ${delta > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                              {delta > 0 ? '+' : ''}{delta}
-                            </span>
-                          )}
+                      {editingColorId === c.id ? (
+                        /* ── Modo edición inline ── */
+                        <div className="mb-2.5 space-y-2">
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cambiar color</p>
+                          <div className="flex flex-wrap gap-1">
+                            {COLOR_PALETTE.map(cp => (
+                              <button
+                                key={cp.hex}
+                                type="button"
+                                onClick={() => { setEditColorHex(cp.hex); setEditColorNombre(cp.nombre) }}
+                                title={cp.nombre}
+                                className={`w-6 h-6 rounded-full border-2 transition-all ${
+                                  editColorHex === cp.hex ? 'border-violet-600 scale-110' : 'border-transparent'
+                                }`}
+                                style={{ backgroundColor: cp.hex }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <span className="w-7 h-7 rounded-full border border-black/10 shrink-0 self-center" style={{ backgroundColor: editColorHex }} />
+                            <input
+                              type="text"
+                              value={editColorNombre}
+                              onChange={e => setEditColorNombre(e.target.value)}
+                              placeholder="Nombre del color"
+                              className="flex-1 h-7 px-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            />
+                            <button type="button" onClick={saveColorEdit}
+                              className="p-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button type="button" onClick={() => setEditingColorId(null)}
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => eliminarColor(c)}
-                          disabled={c.stock > 0}
-                          className="p-1 text-slate-300 hover:text-red-400 disabled:opacity-30 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      ) : (
+                        /* ── Vista normal ── */
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                            <span className="text-sm font-semibold text-slate-700">{c.nombre}</span>
+                            {delta !== 0 && (
+                              <span className={`text-xs font-semibold ${delta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                {delta > 0 ? '+' : ''}{delta}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button type="button"
+                              onClick={() => { setEditingColorId(c.id); setEditColorNombre(c.nombre); setEditColorHex(c.hex) }}
+                              className="p-1 text-slate-300 hover:text-violet-500 transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button type="button" onClick={() => eliminarColor(c)}
+                              disabled={c.stock > 0}
+                              className="p-1 text-slate-300 hover:text-red-400 disabled:opacity-30 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">

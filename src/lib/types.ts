@@ -13,7 +13,8 @@ export interface Producto {
   stock_fisico: number
   stock_minimo: number
   unidad: string
-  categoria: string | null
+  categoria:    string | null
+  subcategoria: string | null
   activo: boolean
   created_at: string
   updated_at: string

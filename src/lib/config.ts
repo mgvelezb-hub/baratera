@@ -23,6 +23,7 @@ export interface ColorPaleta {
 
 export interface ConfigInventario {
   categorias:      string[]
+  subcategorias:   string[]
   semaforo_factor: number     // amarillo si stock < minimo * factor
   colores:         ColorPaleta[]
 }
@@ -53,7 +54,8 @@ export const CONFIG_DEFAULTS: AppConfig = {
     email: 'lamasbaratera@gmail.com',
   },
   inventario: {
-    categorias: ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro'],
+    categorias:    ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro'],
+    subcategorias: [],
     semaforo_factor: 1.5,
     colores: [
       { nombre: 'Rojo',     hex: '#ef4444' }, { nombre: 'Naranja',  hex: '#f97316' },
