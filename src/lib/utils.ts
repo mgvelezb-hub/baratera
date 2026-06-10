@@ -39,16 +39,15 @@ export function pluralUnidad(unidad: string, cantidad: number): string {
   return map[unidad] ?? unidad   // kg, lt y desconocidos no cambian
 }
 
-// Muestra stock como "X [unidad] + Y pzas" cuando el producto tiene piezas_por_caja.
+// Muestra stock como "X cajas + Y {unidad}" — caja es siempre el agrupador mayor.
 // Si piezasPorCaja es null/0, devuelve el formato normal con la unidad del producto.
 export function formatStockConCajas(stock: number, piezasPorCaja: number | null, unidad: string): string {
-  if (!piezasPorCaja) return `${formatNum(stock)} ${unidad}`
-  const unidades = Math.floor(stock / piezasPorCaja)
-  const piezas   = stock % piezasPorCaja
-  const labelU   = pluralUnidad(unidad, unidades)
-  if (unidades === 0) return `${formatNum(piezas)} pzas`
-  if (piezas   === 0) return `${formatNum(unidades)} ${labelU}`
-  return `${formatNum(unidades)} ${labelU} + ${formatNum(piezas)} pzas`
+  if (!piezasPorCaja) return `${formatNum(stock)} ${pluralUnidad(unidad, stock)}`
+  const cajas = Math.floor(stock / piezasPorCaja)
+  const resto  = stock % piezasPorCaja
+  if (cajas === 0) return `${formatNum(resto)} ${pluralUnidad(unidad, resto)}`
+  if (resto  === 0) return `${formatNum(cajas)} ${pluralUnidad('caja', cajas)}`
+  return `${formatNum(cajas)} ${pluralUnidad('caja', cajas)} + ${formatNum(resto)} ${pluralUnidad(unidad, resto)}`
 }
 
 // Gradientes para colores "Surtido" — usados en cualquier componente que muestre bolitas de color

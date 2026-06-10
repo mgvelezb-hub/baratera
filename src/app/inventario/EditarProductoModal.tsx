@@ -57,18 +57,13 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
   useEffect(() => {
     const ppc    = producto.piezas_por_caja ?? 0
     const stocks: Record<string, number> = {}
-    const cajas:  Record<string, number> = {}
     const mins:   Record<string, string> = {}
     for (const c of colores) {
       stocks[c.id] = c.stock
-      cajas[c.id]  = ppc > 0 ? Math.floor(c.stock / ppc) : c.stock
       const dbMin  = c.stock_minimo
-      mins[c.id]   = dbMin !== null && dbMin !== undefined
-        ? String(ppc > 0 ? (dbMin < ppc ? dbMin : Math.round(dbMin / ppc)) : dbMin)
-        : ''
+      mins[c.id]   = dbMin !== null && dbMin !== undefined ? String(dbMin) : ''
     }
     setColorStocks(stocks)
-    setColorStocksCajas(cajas)
     setColorMins(mins)
   }, [colores])
 
@@ -113,7 +108,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
         .select().single()
       if (err || !data) continue
 
-      const minPiezas = ppc > 0 ? stockMin * ppc : stockMin
+      const minPiezas = stockMin
       if (minPiezas) colorMinChanges.push({ color_id: data.id, new_min: minPiezas })
 
       if (nuevoStockGen > 0) {
@@ -186,12 +181,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     umbral_mayoreo:  producto.umbral_mayoreo  ? String(producto.umbral_mayoreo)  : '',
     precio_caja:     producto.precio_caja    ? String(producto.precio_caja)    : '',
     piezas_por_caja: producto.piezas_por_caja ? String(producto.piezas_por_caja) : '',
-    stock_minimo: (() => {
-      const ppc0 = producto.piezas_por_caja ?? 0
-      const v    = producto.stock_minimo
-      // Si el valor guardado es menor que ppc, se asume cajas (bug histórico); si no, convertir de piezas
-      return String(ppc0 > 0 ? (v < ppc0 ? v : Math.round(v / ppc0)) : v)
-    })(),
+    stock_minimo: String(producto.stock_minimo ?? 5),
   })
 
   function set(field: string, value: string) {
@@ -229,7 +219,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
     const colorMinChanges = colores
       .map(c => {
         const cajasUI = colorMins[c.id] !== '' ? parseInt(colorMins[c.id]) : null
-        const newMin  = cajasUI !== null ? (ppc2 > 0 ? cajasUI * ppc2 : cajasUI) : null
+        const newMin  = cajasUI !== null ? cajasUI : null
         return (newMin !== (c.stock_minimo ?? null)) ? { color_id: c.id, new_min: newMin } : null
       })
       .filter(Boolean) as { color_id: string; new_min: number | null }[]
@@ -251,7 +241,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
           umbral_mayoreo:  form.umbral_mayoreo  ? parseInt(form.umbral_mayoreo)    : null,
           precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
           piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
-          stock_minimo:    (parseInt(form.stock_minimo) || 5) * (ppc > 0 ? ppc : 1),
+          stock_minimo:    parseInt(form.stock_minimo) || 5,
         },
         colorStockChanges:  colorStockChanges.length  > 0 ? colorStockChanges  : undefined,
         currentStockFisico: producto.stock_fisico,
@@ -406,7 +396,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
               />
               {parseInt(form.piezas_por_caja) > 0 && parseInt(form.stock_minimo) > 0 && (
                 <p className="text-xs text-slate-400 mt-1">
-                  = {formatNum(parseInt(form.stock_minimo) * parseInt(form.piezas_por_caja))} {form.unidad}
+                  ≈ {formatNum(Math.floor(parseInt(form.stock_minimo) / parseInt(form.piezas_por_caja)))} cajas
                 </p>
               )}
             </div>
@@ -601,32 +591,19 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                           <label className="text-xs text-slate-400 block mb-1">
                             Stock {ppc ? `(${producto.unidad})` : ''}
                           </label>
-                          {ppc ? (
-                            <>
-                              <input
-                                type="number" min="0"
-                                value={colorStocksCajas[c.id] ?? 0}
-                                onChange={e => {
-                                  const cajasVal = parseInt(e.target.value) || 0
-                                  setColorStocksCajas(prev => ({ ...prev, [c.id]: cajasVal }))
-                                  setColorStocks(prev => ({ ...prev, [c.id]: cajasVal * ppc }))
-                                }}
-                                className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
-                              />
-                              {(colorStocksCajas[c.id] ?? 0) > 0 && (
-                                <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                                  = {formatNum((colorStocksCajas[c.id] ?? 0) * ppc)} {form.unidad}
-                                </p>
-                              )}
-                            </>
-                          ) : (
+                          <>
                             <input
                               type="number" min="0"
                               value={stockActual}
                               onChange={e => setColorStocks(prev => ({ ...prev, [c.id]: parseInt(e.target.value) || 0 }))}
                               className="w-full h-8 px-2 rounded-lg border border-slate-300 bg-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
                             />
-                          )}
+                            {ppc && stockActual > 0 && (
+                              <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                                ≈ {formatNum(Math.floor(stockActual / ppc))} cajas
+                              </p>
+                            )}
+                          </>
                         </div>
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">
@@ -644,7 +621,7 @@ export default function EditarProductoModal({ producto, onClose, onSuccess }: Pr
                           />
                           {ppc && (colorMins[c.id] ?? '') !== '' && parseInt(colorMins[c.id] ?? '0') > 0 && (
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                              = {formatNum(parseInt(colorMins[c.id] ?? '0') * ppc)} {form.unidad}
+                              ≈ {formatNum(Math.floor(parseInt(colorMins[c.id] ?? '0') / ppc))} cajas
                             </p>
                           )}
                         </div>

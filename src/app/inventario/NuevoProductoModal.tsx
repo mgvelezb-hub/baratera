@@ -82,9 +82,9 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
     }
     const precioNum = precioUnitario ? parseFloat(precioUnitario) : null
 
-    // Si hay piezas_por_caja, el stock del color se ingresó en esa unidad — convertir a piezas
+    // stock y stock_minimo se ingresan en la unidad base — no hay conversión
     const ppc = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
-    const stockColores = coloresDraft.reduce((s, c) => s + (ppc > 0 ? c.stock * ppc : c.stock), 0)
+    const stockColores = coloresDraft.reduce((s, c) => s + c.stock, 0)
     const stockInicial = coloresDraft.length > 0 ? stockColores : (parseInt(form.stock_fisico) || 0)
 
     const { data: producto, error: insertError } = await supabase
@@ -101,7 +101,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
         precio_caja:     form.precio_caja     ? parseFloat(form.precio_caja)     : null,
         piezas_por_caja: form.piezas_por_caja ? parseInt(form.piezas_por_caja)   : null,
         stock_fisico: stockInicial,
-        stock_minimo: ((parseInt(form.stock_minimo) || 5)) * (ppc > 0 ? ppc : 1),
+        stock_minimo: parseInt(form.stock_minimo) || 5,
         unidad: form.unidad,
       })
       .select()
@@ -117,12 +117,12 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
       // Insertar cada color; stock_minimo se guarda en UPDATE separado (resiliente a migración pendiente)
       let stockAcum = 0
       for (const c of coloresDraft) {
-        const stockPiezas = ppc > 0 ? c.stock * ppc : c.stock
+        const stockPiezas = c.stock
         const { data: colorRow } = await supabase.from('producto_colores')
           .insert({ producto_id: producto.id, nombre: c.nombre, hex: c.hex, stock: stockPiezas })
           .select().single()
-        // stock_minimo por color — convertido a piezas igual que stock
-        const minPiezas = ppc > 0 ? c.stock_minimo * ppc : c.stock_minimo
+        // stock_minimo ya está en unidad base, sin conversión
+        const minPiezas = c.stock_minimo
         if (colorRow && minPiezas > 0) {
           await supabase.from('producto_colores')
             .update({ stock_minimo: minPiezas }).eq('id', colorRow.id)
@@ -352,7 +352,9 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Stock mínimo</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Stock mínimo{parseInt(form.piezas_por_caja) > 0 ? ` (${form.unidad})` : ''}
+              </label>
               <input
                 type="number"
                 min="0"
@@ -360,6 +362,11 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                 onChange={e => set('stock_minimo', e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
+              {parseInt(form.piezas_por_caja) > 0 && parseInt(form.stock_minimo) > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  ≈ {formatNum(Math.floor(parseInt(form.stock_minimo) / parseInt(form.piezas_por_caja)))} cajas
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Unidad</label>
@@ -472,9 +479,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
             {coloresDraft.length > 0 && (
               <div className="space-y-2">
                 {coloresDraft.map((c, i) => {
-                  const ppc         = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
-                  const unidadLabel = form.unidad
-                  const piezasTotal = ppc > 0 ? c.stock * ppc : c.stock
+                  const ppc = form.piezas_por_caja ? parseInt(form.piezas_por_caja) : 0
                   return (
                     <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <div className="flex items-center justify-between mb-2.5">
@@ -493,7 +498,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-slate-400 block mb-1">
-                            Stock inicial <span className="text-slate-300">({unidadLabel})</span>
+                            Stock inicial <span className="text-slate-300">({form.unidad})</span>
                           </label>
                           <input
                             type="number" min="0"
@@ -505,7 +510,7 @@ export default function NuevoProductoModal({ onClose, onSuccess, showCostos = tr
                           />
                           {ppc > 0 && c.stock > 0 && (
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right">
-                              = {formatNum(piezasTotal)} {form.unidad}
+                              ≈ {formatNum(Math.floor(c.stock / ppc))} cajas
                             </p>
                           )}
                         </div>
