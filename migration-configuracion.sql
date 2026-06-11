@@ -30,7 +30,8 @@ insert into configuracion (clave, valor) values
       "web": "lamasbaratera.com.mx",
       "telefono": "5619952549",
       "footer1": "¡Gracias por su compra!",
-      "footer2": "Vuelva pronto"
+      "footer2": "Vuelva pronto",
+      "footer3": "Estimado cliente, por favor revise su mercancia antes de salir de la tienda. NO HAY CAMBIOS NI DEVOLUCIONES de ningun producto"
     }'
   ),
   (
