@@ -29,16 +29,45 @@ interface Props {
 
 type Tab = 'imprimir' | 'correo'
 
-// @page se inyecta dinámicamente en openPrint con el alto exacto del contenido.
+// ════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DE IMPRESIÓN — todo lo ajustable vive aquí.
+//
+// PAPER_MM   → ancho del rollo. Si cambias a impresora de 80mm,
+//              solo cambia este número.
+// MARGIN_MM  → margen lateral del texto. Las térmicas de 58mm
+//              suelen imprimir solo ~48mm centrados; 4mm por lado
+//              deja el texto dentro del área imprimible (50mm).
+//              Si ves texto cortado a la derecha, sube a 5.
+// BUFFER_MM  → colchón vertical extra al final del ticket. Si el
+//              ticket sale cortado abajo, sube este número. Si la
+//              impresora alimenta demasiado papel en blanco, bájalo.
+// MM_PER_PX  → constante física del navegador: CSS define que
+//              1 pulgada = 96px = 25.4mm. NO la cambies.
+// ════════════════════════════════════════════════════════════════
+const PAPER_MM  = 58
+const MARGIN_MM = 4
+const BUFFER_MM = 8
+const MM_PER_PX = 25.4 / 96               // ≈ 0.2646 mm por píxel
+const PAPER_PX  = Math.round(PAPER_MM / MM_PER_PX) // ≈ 219 px
+
+// El @page (tamaño de hoja) se inyecta dinámicamente en openPrint
+// con el alto exacto del contenido ya medido.
 const PRINT_CSS = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: ${PAPER_MM}mm; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
     line-height: 1.35;
-    padding: 0 2mm;
+    padding: 0 ${MARGIN_MM}mm;
     color: #000;
+    /* Fuerza a Chrome a imprimir fondos negros (las barras del logo) */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+  /* Evita que un texto largo SIN espacios (URLs, códigos) se salga
+     del papel y rompa el layout: lo parte donde sea necesario. */
+  p, div, span { overflow-wrap: anywhere; }
 `
 
 function Row({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -53,39 +82,92 @@ function Divider() {
   return <div style={{ borderTop: '1px dashed #000000', margin: '5px 0' }} />
 }
 
-// ── Shared print helper ──────────────────────────────────────────
-// @page height se calcula dinámicamente DENTRO del popup para que
-// siempre quepa en una sola página sin importar el tamaño del pedido.
-// Popup a 400px de ancho; el print usa 50mm ≈ 189px → el contenido
-// es más alto en print. Factor ×2 + 40mm de buffer cubre la diferencia.
+// ════════════════════════════════════════════════════════════════
+// openPrint — imprime el HTML del ticket en papel térmico.
+//
+// CÓMO FUNCIONA (paso a paso):
+//
+// 1. Crea un <iframe> INVISIBLE dentro de la misma página (antes
+//    era un popup con window.open — los popups los bloquea el
+//    navegador y window.print() en popups tiene timing frágil).
+//    El iframe se crea con ancho EXACTO de 219px = 58mm, así el
+//    navegador acomoda el texto (los saltos de línea) igualito a
+//    como se verá en el papel. WYSIWYG real.
+//
+// 2. Espera a que las fuentes terminen de cargar (doc.fonts.ready).
+//    Este era uno de los bugs: si mides la altura ANTES de que la
+//    fuente cargue, el texto se mide con otra fuente, la altura
+//    sale mal, y el ticket se corta.
+//
+// 3. Mide la altura real del contenido (scrollHeight, en px) y la
+//    convierte a milímetros: px × 0.2646 = mm. Le suma BUFFER_MM
+//    de colchón.
+//
+// 4. Inyecta la regla @page con ese alto exacto:
+//       @page { size: 58mm 142mm; margin: 0 }
+//    Esto le dice a Chrome "la hoja mide esto" → TODO cabe en UNA
+//    sola página, no hay paginación, no hay cortes. Y como el
+//    margen va en el CSS (padding del body) y no en la impresora,
+//    Chrome pre-llena papel y márgenes en el diálogo: ya no hay
+//    que acomodarlos a mano.
+//
+// 5. Llama print() y al terminar elimina el iframe.
+// ════════════════════════════════════════════════════════════════
 function openPrint(bodyHtml: string, css = PRINT_CSS): void {
-  const win = window.open('', '_blank', 'width=400,height=3000')
-  if (!win) return
-  win.document.write(
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.style.cssText =
+    'position:fixed;right:0;bottom:0;border:0;visibility:hidden;' +
+    `width:${PAPER_PX}px;height:0;`
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentDocument
+  const win = iframe.contentWindow
+  if (!doc || !win) { iframe.remove(); return }
+
+  doc.open()
+  doc.write(
     '<!DOCTYPE html><html><head>' +
     '<meta charset="utf-8"><title>Ticket</title>' +
     '<style>' + css + '</style>' +
     '</head><body>' + bodyHtml + '</body></html>'
   )
-  win.document.close()
-  win.onafterprint = () => setTimeout(() => win.close(), 1500)
-  const go = () => {
-    // Medir a 204px (= 54mm a 96dpi) — el ancho real del area imprimible en print.
-    // Así el wrapping de texto refleja cómo se verá en papel y el alto es preciso.
-    win.document.body.style.cssText = 'width:204px!important;overflow:hidden'
-    const h = win.document.body.scrollHeight
-    win.document.body.style.cssText = ''
-    const heightMm = Math.ceil(h * 0.265) + 25
-    const pageStyle = win.document.createElement('style')
-    pageStyle.textContent = `@page { size: 58mm ${heightMm}mm; margin: 2mm; }`
-    win.document.head.appendChild(pageStyle)
+  doc.close()
+
+  // Limpieza: quita el iframe al cerrar el diálogo de impresión.
+  // El timer de 60s es un respaldo por si onafterprint no dispara.
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    iframe.remove()
+  }
+  win.onafterprint = () => setTimeout(cleanup, 500)
+  setTimeout(cleanup, 60_000)
+
+  const go = async () => {
+    // Paso 2: esperar fuentes. Si falla (fuente de sistema), seguimos.
+    try { await doc.fonts.ready } catch { /* ok */ }
+
+    // Paso 3: medir. El body ya mide 58mm de ancho por el CSS,
+    // así que scrollHeight es la altura REAL que tendrá en papel.
+    const contentPx = doc.body.scrollHeight
+    const heightMm  = Math.ceil(contentPx * MM_PER_PX) + BUFFER_MM
+
+    // Paso 4: definir la "hoja" del tamaño exacto del ticket.
+    const pageStyle = doc.createElement('style')
+    pageStyle.textContent = `@page { size: ${PAPER_MM}mm ${heightMm}mm; margin: 0; }`
+    doc.head.appendChild(pageStyle)
+
+    // Paso 5: imprimir.
     win.focus()
     win.print()
   }
-  if (win.document.readyState === 'complete') {
-    setTimeout(go, 80)
+
+  if (doc.readyState === 'complete') {
+    void go()
   } else {
-    win.addEventListener('load', () => setTimeout(go, 80), { once: true })
+    win.addEventListener('load', () => void go(), { once: true })
   }
 }
 
@@ -200,7 +282,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
                     <span>{descripcion}</span>
-                    <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(item.subtotal)}</span>
+                    <span style={{ whiteSpace: 'nowrap', paddingLeft: '6px' }}>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>
               )
