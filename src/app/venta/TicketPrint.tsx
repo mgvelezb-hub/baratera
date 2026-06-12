@@ -360,6 +360,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.footer1}</p>
             <p style={{ textAlign: 'center', fontSize: '11px' }}>{negocio.footer2}</p>
+
+            <Divider />
+            <Divider />
+
             <p style={{ textAlign: 'center', fontSize: '10px' }}>{negocio.footer3}</p>
 
           </div>
