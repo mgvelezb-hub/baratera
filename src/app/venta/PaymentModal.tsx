@@ -285,7 +285,7 @@ export default function PaymentModal({ total: totalOriginal, confirmando, onCanc
                     value={codigoStr}
                     onChange={e => { setCodigoStr(e.target.value.toUpperCase()); setCodigoError('') }}
                     onKeyDown={e => e.key === 'Enter' && aplicarCodigo()}
-                    placeholder="Ej. BARA5"
+                    placeholder="Código"
                     className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500 tracking-widest"
                   />
                   <button
