@@ -6,7 +6,7 @@ import {
   Package, Loader2, AlertTriangle, ChevronRight, Monitor,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Producto, ProductoColor } from '@/lib/types'
+import type { Producto, ProductoColor, Cliente } from '@/lib/types'
 import { formatMXN, formatNum, formatStockConCajas, colorStyle } from '@/lib/utils'
 import { calcularSemaforo } from '@/lib/types'
 import PaymentModal, { type PaymentData } from './PaymentModal'
@@ -26,10 +26,13 @@ function cartKey(item: CartItem): string {
 }
 
 interface VentaExitosa {
-  items:   CartItem[]
-  total:   number
-  hora:    string
-  payment: PaymentData
+  items:          CartItem[]
+  total:          number
+  hora:           string
+  payment:        PaymentData
+  numeroTicket?:  string | null
+  clienteNombre?: string | null
+  clienteNumero?: string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -623,6 +626,10 @@ export default function VentaClient() {
   const [confirmando,    setConfirmando]    = useState(false)
   const [ventaExitosa,   setVentaExitosa]   = useState<VentaExitosa | null>(null)
   const [error,          setError]          = useState('')
+  const [clienteActual,  setClienteActual]  = useState<Cliente | null>(null)
+  const [busquedaCliente,setBusquedaCliente]= useState('')
+  const [buscandoCliente,setBuscandoCliente]= useState(false)
+  const [clienteError,   setClienteError]   = useState('')
   const channelRef      = useRef<BroadcastChannel | null>(null)
   // Prevents the cart-empty effect from overwriting the 'complete'
   // screen on the customer display right after a sale is confirmed.
@@ -802,6 +809,19 @@ export default function VentaClient() {
     setCarrito(prev => prev.filter(i => cartKey(i) !== key))
   }
 
+  async function buscarCliente(q: string) {
+    if (!q.trim()) return
+    setBuscandoCliente(true)
+    setClienteError('')
+    try {
+      const res  = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q.trim())}`)
+      const data = await res.json()
+      if (data) setClienteActual(data as Cliente)
+      else      setClienteError('Cliente no encontrado')
+    } catch { setClienteError('Error de conexión') }
+    finally   { setBuscandoCliente(false) }
+  }
+
   async function confirmarVenta(payment: PaymentData) {
     if (carrito.length === 0) return
     setConfirmando(true)
@@ -880,6 +900,13 @@ export default function VentaClient() {
       }
     }
 
+    // Obtener número de ticket (no bloquea la venta si falla)
+    let numeroTicket: string | null = null
+    try {
+      const r = await fetch('/api/ventas/ticket-num', { method: 'POST' })
+      if (r.ok) numeroTicket = (await r.json()).numero_ticket
+    } catch { /* no bloqueamos la venta */ }
+
     // Insert venta header
     const { data: ventaData, error: ventaError } = await supabase
       .from('ventas')
@@ -890,7 +917,11 @@ export default function VentaClient() {
         monto_tarjeta:       payment.montoTarjeta,
         monto_transferencia: payment.montoTransferencia,
         cambio:              payment.cambio,
-        cajero_id:      user?.id ?? null,
+        cajero_id:           user?.id ?? null,
+        cliente_id:          clienteActual?.id ?? null,
+        cupon_pct:           payment.cuponPct ?? null,
+        descuento:           payment.descuento ?? null,
+        numero_ticket:       numeroTicket,
       })
       .select('id')
       .single()
@@ -966,8 +997,18 @@ export default function VentaClient() {
     // Block the cart effect from sending 'idle' while the
     // customer display shows the 'complete' screen.
     saleJustDoneRef.current = true
-    setVentaExitosa({ items: [...carrito], total: ventaTotal, hora, payment })
+    setVentaExitosa({
+      items:         [...carrito],
+      total:         ventaTotal,
+      hora,
+      payment,
+      numeroTicket,
+      clienteNombre: clienteActual?.nombre ?? null,
+      clienteNumero: clienteActual?.numero_cliente ?? null,
+    })
     setCarrito([])
+    setClienteActual(null)
+    setBusquedaCliente('')
     setShowPayment(false)
     setConfirmando(false)
     fetchProductos()
@@ -1122,6 +1163,44 @@ export default function VentaClient() {
           </div>
         </div>
 
+        {/* Widget de cliente */}
+        <div className="border-b border-slate-100 px-3 py-2">
+          {clienteActual ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">Cliente</p>
+                <p className="text-sm font-semibold text-violet-700 leading-tight">{clienteActual.nombre}</p>
+                <p className="text-xs text-slate-400 font-mono">{clienteActual.numero_cliente}</p>
+              </div>
+              <button
+                onClick={() => { setClienteActual(null); setBusquedaCliente(''); setClienteError('') }}
+                className="text-xs text-slate-400 hover:text-red-500 p-1"
+              >✕</button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">Cliente (opcional)</p>
+              <div className="flex gap-1">
+                <input
+                  value={busquedaCliente}
+                  onChange={e => { setBusquedaCliente(e.target.value); setClienteError('') }}
+                  onKeyDown={e => e.key === 'Enter' && buscarCliente(busquedaCliente)}
+                  placeholder="N° o teléfono"
+                  className="flex-1 text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                />
+                <button
+                  onClick={() => buscarCliente(busquedaCliente)}
+                  disabled={buscandoCliente}
+                  className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded transition-colors"
+                >
+                  {buscandoCliente ? '…' : 'Buscar'}
+                </button>
+              </div>
+              {clienteError && <p className="text-xs text-red-500 mt-1">{clienteError}</p>}
+            </div>
+          )}
+        </div>
+
         {error && (
           <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
             <AlertTriangle className="w-4 h-4 shrink-0" />{error}
@@ -1232,6 +1311,9 @@ export default function VentaClient() {
         hora={ventaExitosa.hora}
         onClose={resetDisplay}
         onNuevaVenta={resetDisplay}
+        numeroTicket={ventaExitosa.numeroTicket}
+        clienteNombre={ventaExitosa.clienteNombre}
+        clienteNumero={ventaExitosa.clienteNumero}
       />
     )}
     </>

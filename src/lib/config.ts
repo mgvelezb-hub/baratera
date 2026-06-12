@@ -10,6 +10,7 @@ export interface ConfigNegocio {
   telefono:   string
   footer1:    string
   footer2:    string
+  footer3?:   string
 }
 
 export interface ConfigAlertas {

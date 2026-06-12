@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Loader2, ChevronDown, ChevronUp,
   AlertTriangle, Lock, Save, KeyRound,
 } from 'lucide-react'
-import { PERMISOS_CATALOGO, type Permisos } from '@/lib/permisos'
+import { PERMISOS_CATALOGO, GRUPOS_LISTA, type Permisos } from '@/lib/permisos'
 
 export interface RoleRow {
   id:          string
@@ -24,9 +24,7 @@ interface Props {
   showToast:        (msg: string, ok: boolean) => void
 }
 
-const GRUPOS = ['Inventario', 'Venta', 'Administración'] as const
-
-// ── Editor de permisos (checkboxes agrupados) ────────────────────
+// ── Editor de permisos (checkboxes agrupados por módulo) ────────────────────
 function PermisosEditor({
   permisos, onChange, disabled = false,
 }: {
@@ -42,34 +40,73 @@ function PermisosEditor({
     onChange(next)
   }
 
+  function toggleGrupo(grupo: string, keys: string[]) {
+    if (disabled) return
+    const allOn = keys.every(k => permisos[k] === true)
+    const next = { ...permisos }
+    if (allOn) keys.forEach(k => delete next[k])
+    else keys.forEach(k => { next[k] = true })
+    onChange(next)
+  }
+
   return (
-    <div className="space-y-3">
-      {GRUPOS.map(grupo => (
-        <div key={grupo}>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{grupo}</p>
-          <div className="grid sm:grid-cols-2 gap-1">
-            {PERMISOS_CATALOGO.filter(p => p.grupo === grupo).map(p => (
-              <label
-                key={p.key}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
-                  disabled
-                    ? 'text-slate-400 cursor-not-allowed'
-                    : 'text-slate-700 hover:bg-slate-50 cursor-pointer'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={permisos[p.key] === true}
-                  onChange={() => toggle(p.key)}
-                  disabled={disabled}
-                  className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
-                />
-                {p.label}
-              </label>
-            ))}
+    <div className="space-y-2">
+      {GRUPOS_LISTA.map(grupo => {
+        const items = PERMISOS_CATALOGO.filter(p => p.grupo === grupo)
+        if (!items.length) return null
+        const allOn = items.every(p => permisos[p.key] === true)
+        const someOn = !allOn && items.some(p => permisos[p.key] === true)
+        return (
+          <div key={grupo} className="border border-slate-100 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleGrupo(grupo, items.map(p => p.key))}
+              disabled={disabled}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide transition-colors ${
+                disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'
+              } ${allOn ? 'bg-violet-50 text-violet-700' : someOn ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-500'}`}
+            >
+              <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                allOn ? 'bg-violet-600 border-violet-600' : someOn ? 'bg-amber-400 border-amber-400' : 'border-slate-300 bg-white'
+              }`}>
+                {(allOn || someOn) && (
+                  <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 text-white fill-current">
+                    {allOn
+                      ? <path d="M1.5 5l2.5 2.5 5-5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                      : <rect x="2" y="4" width="6" height="2" rx="1"/>
+                    }
+                  </svg>
+                )}
+              </span>
+              {grupo}
+              <span className="ml-auto font-normal normal-case text-[10px] opacity-60">
+                {items.filter(p => permisos[p.key]).length}/{items.length}
+              </span>
+            </button>
+            <div className="grid sm:grid-cols-2 gap-0 px-1 py-1">
+              {items.map(p => (
+                <label
+                  key={p.key}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                    disabled
+                      ? 'text-slate-400 cursor-not-allowed'
+                      : 'text-slate-700 hover:bg-slate-50 cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={permisos[p.key] === true}
+                    onChange={() => toggle(p.key)}
+                    disabled={disabled}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
+                  />
+                  <span className="leading-tight">{p.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

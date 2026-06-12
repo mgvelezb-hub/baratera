@@ -171,6 +171,19 @@ export interface ProductoColor {
   created_at:   string
 }
 
+// ── Clientes ──────────────────────────────────────────────────
+export interface Cliente {
+  id:             string
+  numero_cliente: string
+  nombre:         string
+  telefono:       string
+  correo:         string | null
+  recibe_promo:   boolean
+  tipo:           'frecuente' | 'mayorista'
+  notas:          string | null
+  created_at:     string
+}
+
 // ── Ventas ────────────────────────────────────────────────────
 export interface Venta {
   id:                  string
@@ -182,6 +195,14 @@ export interface Venta {
   cambio:              number
   cajero_id:           string | null
   created_at:          string
+  cliente_id?:         string | null
+  cupon_pct?:          number | null
+  descuento?:          number | null
+  numero_ticket?:      string | null
+  clientes?: {
+    nombre:         string
+    numero_cliente: string
+  } | null
 }
 
 // ── Corte de caja ─────────────────────────────────────────────

@@ -1,21 +1,22 @@
-import AppShell from '@/components/AppShell'
-import ProximamenteCard from '@/components/ProximamenteCard'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { requirePermiso }    from '@/lib/permisos-server'
+import AppShell              from '@/components/AppShell'
+import ClientesClient        from './ClientesClient'
+import type { Cliente }      from '@/lib/types'
 
-export default function ClientesPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function ClientesPage() {
+  await requirePermiso('clientes.ver')
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from('clientes')
+    .select('*')
+    .order('nombre')
+
   return (
     <AppShell>
-      <ProximamenteCard
-        modulo="Clientes (CRM)"
-        emoji="👥"
-        descripcion="Perfil unificado de cada cliente por número de teléfono, con historial de compras y promociones automáticas."
-        features={[
-          'Un solo perfil por cliente sin importar el canal (WA, POS, tienda)',
-          'Motor de reglas de promociones configurables desde el dashboard',
-          'Chatbot incluye promociones activas en cada cotización',
-          'Reactivación automática a clientes inactivos por más de N días',
-          'Broadcast segmentado a grupos de clientes por WhatsApp',
-        ]}
-      />
+      <ClientesClient clientes={(data ?? []) as Cliente[]} />
     </AppShell>
   )
 }

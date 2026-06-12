@@ -90,6 +90,8 @@ export default async function DashboardPage() {
 
   const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
+  const admin = createAdminClient()
+
   const [
     { data: ventasHoy },
     { data: entradasHoy },
@@ -104,6 +106,8 @@ export default async function DashboardPage() {
     { data: ledgerSemana },
     { data: cortesDB },
     { data: entradasConCosto },
+    { data: ticketsRecientes },
+    { data: cuponesUsados },
   ] = await Promise.all([
     supabase.from('ventas').select('total').gte('created_at', todayStart),
     supabase.from('stock_ledger').select('id')
@@ -139,6 +143,16 @@ export default async function DashboardPage() {
       .not('precio_unitario', 'is', null)
       .order('created_at', { ascending: false })
       .limit(100),
+    admin.from('ventas')
+      .select('id, total, cupon_pct, descuento, numero_ticket, created_at, clientes(nombre, numero_cliente)')
+      .not('numero_ticket', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(15),
+    admin.from('ventas')
+      .select('id, total, cupon_pct, descuento, numero_ticket, created_at, clientes(nombre, numero_cliente)')
+      .not('cupon_pct', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(8),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
@@ -955,6 +969,80 @@ export default async function DashboardPage() {
             </ul>
           )}
         </div>
+
+        {/* ── Tickets recientes ──────────────────────────────── */}
+        {ticketsRecientes && ticketsRecientes.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Receipt className="w-3.5 h-3.5 text-violet-500" />
+                Tickets recientes
+              </p>
+              <Link href="/clientes" className="text-xs text-violet-600 font-medium hover:underline">Ver clientes →</Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Ticket</th>
+                    <th className="px-4 py-2 text-left">Tiempo</th>
+                    <th className="px-4 py-2 text-left">Cliente</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-center">Cupón</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(ticketsRecientes as any[]).map(t => (
+                    <tr key={t.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2 font-mono text-xs text-violet-600 font-semibold">{t.numero_ticket}</td>
+                      <td className="px-4 py-2 text-slate-500 text-xs">{tiempoRelativo(t.created_at)}</td>
+                      <td className="px-4 py-2 text-slate-700 text-xs">
+                        {(t.clientes as any)?.nombre ?? <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-right font-semibold text-slate-800">{formatMXNFull(Number(t.total))}</td>
+                      <td className="px-4 py-2 text-center">
+                        {t.cupon_pct
+                          ? <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded font-medium">-{t.cupon_pct}%</span>
+                          : <span className="text-slate-300 text-xs">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Cupones usados ─────────────────────────────────── */}
+        {cuponesUsados && cuponesUsados.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <p className="text-sm font-semibold text-slate-700">Cupones usados recientemente</p>
+              <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold ml-1">
+                {(cuponesUsados as any[]).length}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {(cuponesUsados as any[]).map(t => (
+                <div key={t.id} className="flex items-center justify-between px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-violet-600 font-semibold">{t.numero_ticket ?? '—'}</span>
+                    <span className="text-sm font-bold text-amber-600">{t.cupon_pct}% Off</span>
+                    {(t.clientes as any)?.nombre && (
+                      <span className="text-xs text-slate-500">· {(t.clientes as any).nombre}</span>
+                    )}
+                    <span className="text-xs text-slate-400">{tiempoRelativo(t.created_at)}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-red-500 font-medium">−{formatMXNFull(Number(t.descuento ?? 0))}</p>
+                    <p className="text-sm font-bold text-slate-800">{formatMXNFull(Number(t.total))}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </AppShell>

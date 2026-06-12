@@ -10,6 +10,8 @@ export interface PaymentData {
   montoTarjeta:        number
   montoTransferencia:  number
   cambio:              number
+  cuponPct?:           number | null
+  descuento?:          number | null
 }
 
 interface Props {
@@ -21,11 +23,15 @@ interface Props {
 
 type Metodo = PaymentData['metodo']
 
-export default function PaymentModal({ total, confirmando, onCancel, onConfirmar }: Props) {
+export default function PaymentModal({ total: totalOriginal, confirmando, onCancel, onConfirmar }: Props) {
   const [metodo,         setMetodo]         = useState<Metodo>('efectivo')
   const [recibidoStr,    setRecibidoStr]    = useState('')
   const [tarjetaStr,     setTarjetaStr]     = useState('')
   const [digitalConfirm, setDigitalConfirm] = useState(false)
+  const [cuponPct,       setCuponPct]       = useState<number | null>(null)
+
+  const descuento  = cuponPct ? Math.round(totalOriginal * cuponPct) / 100 : 0
+  const total      = totalOriginal - descuento
 
   const recibido = parseFloat(recibidoStr) || 0
   const tarjeta  = parseFloat(tarjetaStr)  || 0
@@ -49,14 +55,15 @@ export default function PaymentModal({ total, confirmando, onCancel, onConfirmar
   async function handleConfirmar() {
     if (!canConfirm()) return
     let data: PaymentData
+    const extra = { cuponPct, descuento: descuento > 0 ? descuento : null }
     if (metodo === 'efectivo') {
-      data = { metodo, montoEfectivo: recibido, montoTarjeta: 0, montoTransferencia: 0, cambio: cambioEfectivo }
+      data = { metodo, montoEfectivo: recibido, montoTarjeta: 0, montoTransferencia: 0, cambio: cambioEfectivo, ...extra }
     } else if (metodo === 'tarjeta') {
-      data = { metodo, montoEfectivo: 0, montoTarjeta: total, montoTransferencia: 0, cambio: 0 }
+      data = { metodo, montoEfectivo: 0, montoTarjeta: total, montoTransferencia: 0, cambio: 0, ...extra }
     } else if (metodo === 'transferencia') {
-      data = { metodo, montoEfectivo: 0, montoTarjeta: 0, montoTransferencia: total, cambio: 0 }
+      data = { metodo, montoEfectivo: 0, montoTarjeta: 0, montoTransferencia: total, cambio: 0, ...extra }
     } else {
-      data = { metodo, montoEfectivo: recibido, montoTarjeta: tarjeta, montoTransferencia: 0, cambio: mixtoCambio }
+      data = { metodo, montoEfectivo: recibido, montoTarjeta: tarjeta, montoTransferencia: 0, cambio: mixtoCambio, ...extra }
     }
     await onConfirmar(data)
   }
@@ -66,6 +73,7 @@ export default function PaymentModal({ total, confirmando, onCancel, onConfirmar
     setDigitalConfirm(false)
     setRecibidoStr('')
     setTarjetaStr('')
+    setCuponPct(null)
   }
 
   const tabs: { id: Metodo; label: string; icon: React.ReactNode }[] = [
@@ -85,7 +93,14 @@ export default function PaymentModal({ total, confirmando, onCancel, onConfirmar
         <div className="flex items-center justify-between p-5 pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Cobrar</h2>
-            <p className="text-2xl font-bold text-violet-700 mt-0.5">{formatMXN(total)}</p>
+            {cuponPct ? (
+              <div className="mt-0.5">
+                <span className="text-sm text-slate-400 line-through mr-2">{formatMXN(totalOriginal)}</span>
+                <span className="text-2xl font-bold text-green-600">{formatMXN(total)}</span>
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-violet-700 mt-0.5">{formatMXN(total)}</p>
+            )}
           </div>
           <button onClick={onCancel} disabled={confirmando} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
             <X className="w-4 h-4" />
@@ -224,6 +239,33 @@ export default function PaymentModal({ total, confirmando, onCancel, onConfirmar
               )}
             </div>
           )}
+
+          {/* Cupones */}
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-400 font-medium mb-2">Cupón de descuento (opcional)</p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {[5, 10, 15, 20].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => setCuponPct(cuponPct === pct ? null : pct)}
+                  className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    cuponPct === pct
+                      ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-green-400 hover:text-green-700'
+                  }`}
+                >
+                  {pct}% Off
+                </button>
+              ))}
+            </div>
+            {cuponPct && (
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-slate-500">Descuento aplicado</span>
+                <span className="text-green-600 font-semibold">−{formatMXN(descuento)}</span>
+              </div>
+            )}
+          </div>
 
           {/* Confirm button */}
           <button

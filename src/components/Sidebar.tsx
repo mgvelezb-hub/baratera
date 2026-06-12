@@ -22,7 +22,7 @@ const MODULES = [
   { id: 'costos',          label: 'Costos',          href: '/costos',          icon: Receipt,      built: true,  permiso: 'costos.ver',      devOnly: false },
   { id: 'dashboard',       label: 'Dashboard',       href: '/dashboard',       icon: BarChart3,    built: true,  permiso: 'dashboard.ver',   devOnly: false },
   { id: 'pedidos',         label: 'Pedidos',         href: '/pedidos',         icon: ClipboardList,built: false, permiso: 'dashboard.ver',   devOnly: false },
-  { id: 'clientes',        label: 'Clientes',        href: '/clientes',        icon: Users,        built: false, permiso: 'dashboard.ver',   devOnly: false },
+  { id: 'clientes',        label: 'Clientes',        href: '/clientes',        icon: Users,        built: true,  permiso: 'clientes.ver',    devOnly: false },
   { id: 'configuraciones', label: 'Configuraciones', href: '/configuraciones', icon: Settings,     built: true,  permiso: '',                devOnly: true  },
 ]
 

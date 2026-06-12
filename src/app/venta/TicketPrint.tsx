@@ -19,12 +19,15 @@ export interface TicketItem {
 }
 
 interface Props {
-  items:        TicketItem[]
-  total:        number
-  payment:      PaymentData
-  hora:         string
-  onClose:      () => void
-  onNuevaVenta: () => void
+  items:          TicketItem[]
+  total:          number
+  payment:        PaymentData
+  hora:           string
+  onClose:        () => void
+  onNuevaVenta:   () => void
+  numeroTicket?:  string | null
+  clienteNombre?: string | null
+  clienteNumero?: string | null
 }
 
 type Tab = 'imprimir' | 'correo'
@@ -171,7 +174,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   }
 }
 
-export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta }: Props) {
+export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
   const [tab,          setTab]          = useState<Tab>('imprimir')
   const [email,        setEmail]        = useState('')
@@ -264,7 +267,17 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             </p>
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.web}</p>
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.telefono}</p>
-            <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
+            <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '2px' }}>{hora}</p>
+            {(numeroTicket || clienteNombre) && (
+              <div style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>
+                {numeroTicket && <p style={{ fontWeight: 'bold' }}>Ticket: {numeroTicket}</p>}
+                {clienteNombre && (
+                  <p>
+                    {clienteNumero ? `${clienteNumero} — ` : ''}{clienteNombre}
+                  </p>
+                )}
+              </div>
+            )}
 
             <Divider />
 
@@ -291,6 +304,12 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             <Divider />
 
             {/* Total */}
+            {payment.cuponPct && payment.descuento && (
+              <Row style={{ fontSize: '11px' }}>
+                <span>Descuento {payment.cuponPct}% Off</span>
+                <span style={{ whiteSpace: 'nowrap' }}>−{formatMXN(payment.descuento)}</span>
+              </Row>
+            )}
             <Row style={{ fontSize: '16px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
               <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
