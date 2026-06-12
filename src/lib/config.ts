@@ -10,7 +10,7 @@ export interface ConfigNegocio {
   telefono:   string
   footer1:    string
   footer2:    string
-  footer3?:   string
+  footer3:    string
 }
 
 export interface ConfigAlertas {
@@ -51,12 +51,13 @@ export const CONFIG_DEFAULTS: AppConfig = {
     telefono:   '5619952549',
     footer1:    '¡Gracias por su compra!',
     footer2:    'Vuelva pronto',
+    footer3:    'Estimado cliente, por favor revise su mercancia antes de salir de la tienda. NO HAY CAMBIOS NI DEVOLUCIONES de ningun producto'
   },
   alertas: {
     email: 'lamasbaratera@gmail.com',
   },
   inventario: {
-    categorias:    ['Cuadernos', 'Escritura', 'Corrección', 'Arte y manualidades', 'Oficina', 'Escolar', 'Tecnología', 'Otro'],
+    categorias:    ['Cuadernos', 'Lápices', 'Foamy','Arte y manualidades', 'Escolar', 'Pegamento', 'Papel', 'Juguetes', 'Otro'],
     subcategorias: [],
     semaforo_factor: 1.5,
     colores: [
