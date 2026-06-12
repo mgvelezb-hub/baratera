@@ -356,12 +356,10 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.cambio)}</span>
               </Row>
             )}
-            <Row>
-              <Divider />
-              <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.footer1}</p>
-              <p style={{ textAlign: 'center', fontSize: '11px' }}>{negocio.footer2}</p>
-            </Row> 
             
+            <Divider />
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.footer1}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px' }}>{negocio.footer2}</p>
             <Row>
             <p style={{ textAlign: 'center', fontSize: '10px' }}>{negocio.footer3}</p>
             </Row>
