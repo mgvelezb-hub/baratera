@@ -133,6 +133,7 @@ export default function AjustesTab({ config, migrationPending, onSaved, showToas
           <Field label="Teléfono"   value={negocio.telefono} onChange={v => setNegocio({ ...negocio, telefono: v })} />
           <Field label="Footer — línea 1" value={negocio.footer1} onChange={v => setNegocio({ ...negocio, footer1: v })} placeholder="¡Gracias por su compra!" />
           <Field label="Footer — línea 2" value={negocio.footer2} onChange={v => setNegocio({ ...negocio, footer2: v })} placeholder="Vuelva pronto" />
+          <Field label="Footer — línea 3" value={negocio.footer3} onChange={v => setNegocio({ ...negocio, footer3: v })} placeholder="Estimado cliente, por favor revise su mercancia antes de salir de la tienda. NO HAY CAMBIOS NI DEVOLUCIONES de ningun producto" />
         </div>
         <SaveButton onClick={() => save('negocio', negocio)} saving={saving === 'negocio'} dirty={dirtyNegocio} />
       </Section>
