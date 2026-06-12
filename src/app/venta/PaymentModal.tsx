@@ -23,12 +23,21 @@ interface Props {
 
 type Metodo = PaymentData['metodo']
 
+const COUPON_CODES: Record<string, number> = {
+  'BARA5':    5,
+  '10PAPE':   10,
+  'LAMAS15':  15,
+  'LABARA20': 20,
+}
+
 export default function PaymentModal({ total: totalOriginal, confirmando, onCancel, onConfirmar }: Props) {
   const [metodo,         setMetodo]         = useState<Metodo>('efectivo')
   const [recibidoStr,    setRecibidoStr]    = useState('')
   const [tarjetaStr,     setTarjetaStr]     = useState('')
   const [digitalConfirm, setDigitalConfirm] = useState(false)
   const [cuponPct,       setCuponPct]       = useState<number | null>(null)
+  const [codigoStr,      setCodigoStr]      = useState('')
+  const [codigoError,    setCodigoError]    = useState('')
 
   const descuento  = cuponPct ? Math.round(totalOriginal * cuponPct) / 100 : 0
   const total      = totalOriginal - descuento
@@ -74,6 +83,19 @@ export default function PaymentModal({ total: totalOriginal, confirmando, onCanc
     setRecibidoStr('')
     setTarjetaStr('')
     setCuponPct(null)
+    setCodigoStr('')
+    setCodigoError('')
+  }
+
+  function aplicarCodigo() {
+    const pct = COUPON_CODES[codigoStr.trim().toUpperCase()]
+    if (pct) {
+      setCuponPct(pct)
+      setCodigoError('')
+    } else {
+      setCodigoError('Código no válido')
+      setCuponPct(null)
+    }
   }
 
   const tabs: { id: Metodo; label: string; icon: React.ReactNode }[] = [
@@ -240,30 +262,45 @@ export default function PaymentModal({ total: totalOriginal, confirmando, onCanc
             </div>
           )}
 
-          {/* Cupones */}
+          {/* Código de descuento */}
           <div className="border-t border-slate-100 pt-3">
-            <p className="text-xs text-slate-400 font-medium mb-2">Cupón de descuento (opcional)</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {[5, 10, 15, 20].map(pct => (
-                <button
-                  key={pct}
-                  type="button"
-                  onClick={() => setCuponPct(cuponPct === pct ? null : pct)}
-                  className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    cuponPct === pct
-                      ? 'bg-green-600 text-white border-green-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-green-400 hover:text-green-700'
-                  }`}
-                >
-                  {pct}% Off
-                </button>
-              ))}
-            </div>
-            {cuponPct && (
-              <div className="mt-2 flex justify-between text-sm">
-                <span className="text-slate-500">Descuento aplicado</span>
-                <span className="text-green-600 font-semibold">−{formatMXN(descuento)}</span>
+            <p className="text-xs text-slate-400 font-medium mb-2">Código de descuento</p>
+            {cuponPct ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                <span className="text-sm text-green-700 font-semibold">✓ {codigoStr} — {cuponPct}% Off</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-green-600 font-bold">−{formatMXN(descuento)}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setCuponPct(null); setCodigoStr(''); setCodigoError('') }}
+                    className="text-green-500 hover:text-red-500 text-xs"
+                  >✕</button>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={codigoStr}
+                    onChange={e => { setCodigoStr(e.target.value.toUpperCase()); setCodigoError('') }}
+                    onKeyDown={e => e.key === 'Enter' && aplicarCodigo()}
+                    placeholder="Ej. BARA5"
+                    className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500 tracking-widest"
+                  />
+                  <button
+                    type="button"
+                    onClick={aplicarCodigo}
+                    disabled={!codigoStr.trim()}
+                    className="h-10 px-4 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-sm font-medium rounded-xl transition-colors"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+                {codigoError && (
+                  <p className="text-xs text-red-500 mt-1">{codigoError}</p>
+                )}
+              </>
             )}
           </div>
 

@@ -17,3 +17,25 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!cliente) return NextResponse.json({ error: 'not found' }, { status: 404 })
   return NextResponse.json({ cliente, tickets: tickets ?? [] })
 }
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id }   = await params
+  const body     = await req.json()
+  const { tipo } = body
+
+  const TIPOS_VALIDOS = ['normal', 'mayorista', 'frecuente']
+  if (!tipo || !TIPOS_VALIDOS.includes(tipo)) {
+    return NextResponse.json({ error: 'tipo inválido' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('clientes')
+    .update({ tipo })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}

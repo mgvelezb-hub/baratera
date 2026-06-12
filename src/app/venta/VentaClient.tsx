@@ -609,25 +609,64 @@ function CarritoPanel({
   )
 }
 
+const TIPO_BADGE: Record<string, string> = {
+  normal:    'bg-slate-100 text-slate-600',
+  frecuente: 'bg-blue-50 text-blue-700',
+  mayorista: 'bg-amber-100 text-amber-700',
+}
+
 // ── Modal: identificar cliente antes del pago ──────────────────
 function ClienteLookupModal({ onConfirm }: { onConfirm: (c: Cliente | null) => void }) {
-  const [query,    setQuery]    = useState('')
-  const [buscando, setBuscando] = useState(false)
-  const [cliente,  setCliente]  = useState<Cliente | null>(null)
-  const [error,    setError]    = useState('')
+  const [query,      setQuery]      = useState('')
+  const [buscando,   setBuscando]   = useState(false)
+  const [cliente,    setCliente]    = useState<Cliente | null>(null)
+  const [noEncontrado, setNoEncontrado] = useState(false)
+  const [showForm,   setShowForm]   = useState(false)
+  // Alta rápida
+  const [altaNombre, setAltaNombre] = useState('')
+  const [altaTipo,   setAltaTipo]   = useState<'normal' | 'mayorista'>('normal')
+  const [altaGuardando, setAltaGuardando] = useState(false)
+  const [altaError,  setAltaError]  = useState('')
+
+  const esNumTelefono = /^\d{10}$/.test(query.trim())
 
   async function buscar(q: string) {
     if (!q.trim()) return
     setBuscando(true)
-    setError('')
+    setNoEncontrado(false)
     setCliente(null)
+    setShowForm(false)
+    setAltaError('')
     try {
       const res  = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q.trim())}`)
       const data = await res.json()
       if (data) setCliente(data as Cliente)
-      else      setError('Cliente no encontrado')
-    } catch { setError('Error de conexión') }
+      else      setNoEncontrado(true)
+    } catch { setNoEncontrado(true) }
     finally   { setBuscando(false) }
+  }
+
+  async function darDeAlta() {
+    if (!altaNombre.trim() || !query.trim()) return
+    setAltaGuardando(true)
+    setAltaError('')
+    try {
+      const res  = await fetch('/api/clientes', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          nombre:   altaNombre.trim(),
+          telefono: query.trim(),
+          tipo:     altaTipo,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAltaError(data.error ?? 'Error al registrar'); return }
+      setCliente(data as Cliente)
+      setShowForm(false)
+      setNoEncontrado(false)
+    } catch { setAltaError('Error de conexión') }
+    finally { setAltaGuardando(false) }
   }
 
   return (
@@ -644,13 +683,20 @@ function ClienteLookupModal({ onConfirm }: { onConfirm: (c: Cliente | null) => v
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Búsqueda */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de cliente o teléfono</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={query}
-                onChange={e => { setQuery(e.target.value); setError(''); setCliente(null) }}
+                onChange={e => {
+                  setQuery(e.target.value)
+                  setNoEncontrado(false)
+                  setCliente(null)
+                  setShowForm(false)
+                  setAltaError('')
+                }}
                 onKeyDown={e => e.key === 'Enter' && buscar(query)}
                 placeholder="CLI-0001 o 5512345678"
                 autoFocus
@@ -666,24 +712,85 @@ function ClienteLookupModal({ onConfirm }: { onConfirm: (c: Cliente | null) => v
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-slate-500 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              {error}
-            </p>
-          )}
-
+          {/* Cliente encontrado */}
           {cliente && (
             <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-violet-800">{cliente.nombre}</p>
                 <p className="text-xs text-violet-500 font-mono mt-0.5">{cliente.numero_cliente} · {cliente.telefono}</p>
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${
-                cliente.tipo === 'mayorista' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700'
-              }`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${TIPO_BADGE[cliente.tipo] ?? ''}`}>
                 {cliente.tipo}
               </span>
+            </div>
+          )}
+
+          {/* No encontrado — opción de dar de alta */}
+          {noEncontrado && !showForm && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+              <p className="text-sm text-amber-800 font-medium">Cliente no encontrado</p>
+              {esNumTelefono && (
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="text-xs text-violet-600 hover:text-violet-800 font-semibold flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Dar de alta con este número
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Formulario rápido de alta */}
+          {showForm && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Alta rápida</p>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={altaNombre}
+                  onChange={e => setAltaNombre(e.target.value)}
+                  placeholder="Nombre del cliente"
+                  autoFocus
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Tipo</label>
+                <div className="flex gap-2">
+                  {(['normal', 'mayorista'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setAltaTipo(t)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
+                        altaTipo === t
+                          ? 'bg-violet-600 text-white border-violet-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Teléfono: <span className="font-mono font-medium">{query.trim()}</span></p>
+              {altaError && <p className="text-xs text-red-500">{altaError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowForm(false); setAltaError('') }}
+                  className="flex-1 h-8 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={darDeAlta}
+                  disabled={!altaNombre.trim() || altaGuardando}
+                  className="flex-1 h-8 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                >
+                  {altaGuardando ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Registrar'}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -700,7 +807,7 @@ function ClienteLookupModal({ onConfirm }: { onConfirm: (c: Cliente | null) => v
             disabled={!cliente}
             className="flex-1 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold transition-colors"
           >
-            {cliente ? `Confirmar` : 'Seleccionar'}
+            {cliente ? 'Confirmar' : 'Seleccionar'}
           </button>
         </div>
       </div>
@@ -1074,6 +1181,46 @@ export default function VentaClient() {
 
     const ventaTotal = totalCarrito(carrito)
     const hora       = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+    // Auto-upgrade a frecuente: si el cliente normal acumula ≥5 compras en el mes
+    if (clienteActual && clienteActual.tipo === 'normal') {
+      try {
+        const mesInicio = new Date()
+        mesInicio.setDate(1)
+        mesInicio.setHours(0, 0, 0, 0)
+        const { count } = await supabase
+          .from('ventas')
+          .select('*', { count: 'exact', head: true })
+          .eq('cliente_id', clienteActual.id)
+          .gte('created_at', mesInicio.toISOString())
+        if ((count ?? 0) >= 5) {
+          await fetch(`/api/clientes/${clienteActual.id}`, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ tipo: 'frecuente' }),
+          })
+        }
+      } catch { /* no bloquea la venta */ }
+    }
+
+    // Notificación de cupón para admin (no bloquea si falla)
+    if (payment.cuponPct && ventaData) {
+      supabase.from('notificaciones').insert({
+        tipo:    'cupon_usado',
+        mensaje: `Cupón ${payment.cuponPct}% Off aplicado${clienteActual ? ` — ${clienteActual.nombre} (${clienteActual.numero_cliente})` : ' — venta sin cliente'}`,
+        datos:   {
+          cupon_pct:     payment.cuponPct,
+          descuento:     payment.descuento,
+          total_final:   ventaTotal,
+          venta_id:      ventaData.id,
+          numero_ticket: numeroTicket,
+          hora,
+          cliente: clienteActual
+            ? { nombre: clienteActual.nombre, numero: clienteActual.numero_cliente, id: clienteActual.id }
+            : null,
+        },
+      })
+    }
 
     // Tell display: sale complete
     channelRef.current?.postMessage({

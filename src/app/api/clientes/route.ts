@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       telefono:     telefono.trim(),
       correo:       correo?.trim() || null,
       recibe_promo: recibe_promo ?? false,
-      tipo:         tipo ?? 'frecuente',
+      tipo:         tipo ?? 'normal',
       notas:        notas?.trim() || null,
       numero_cliente,
     })

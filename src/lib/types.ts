@@ -179,7 +179,7 @@ export interface Cliente {
   telefono:       string
   correo:         string | null
   recibe_promo:   boolean
-  tipo:           'frecuente' | 'mayorista'
+  tipo:           'normal' | 'mayorista' | 'frecuente'
   notas:          string | null
   created_at:     string
 }

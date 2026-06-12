@@ -8,7 +8,7 @@ interface Props {
   onCerrar: () => void
 }
 
-const EMPTY = { nombre: '', telefono: '', correo: '', tipo: 'frecuente', recibe_promo: false, notas: '' }
+const EMPTY = { nombre: '', telefono: '', correo: '', tipo: 'normal', recibe_promo: false, notas: '' }
 
 export default function NuevoClienteModal({ onCreado, onCerrar }: Props) {
   const [form, setForm]     = useState(EMPTY)
@@ -73,7 +73,7 @@ export default function NuevoClienteModal({ onCreado, onCerrar }: Props) {
               <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
               <select value={form.tipo} onChange={set('tipo')}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500">
-                <option value="frecuente">Frecuente</option>
+                <option value="normal">Normal</option>
                 <option value="mayorista">Mayorista</option>
               </select>
             </div>

@@ -108,6 +108,7 @@ export default async function DashboardPage() {
     { data: entradasConCosto },
     { data: ticketsRecientes },
     { data: cuponesUsados },
+    { data: alertasDB },
   ] = await Promise.all([
     supabase.from('ventas').select('total').gte('created_at', todayStart),
     supabase.from('stock_ledger').select('id')
@@ -153,6 +154,11 @@ export default async function DashboardPage() {
       .not('cupon_pct', 'is', null)
       .order('created_at', { ascending: false })
       .limit(8),
+    admin.from('notificaciones')
+      .select('*')
+      .eq('leida', false)
+      .order('created_at', { ascending: false })
+      .limit(20),
   ])
 
   // ── KPI calculations ──────────────────────────────────────
@@ -1014,6 +1020,36 @@ export default async function DashboardPage() {
         )}
 
         {/* ── Cupones usados ─────────────────────────────────── */}
+        {/* ── Alertas (notificaciones no leídas) ─────────────────── */}
+        {alertasDB && alertasDB.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-red-200 flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+              <p className="text-sm font-semibold text-red-800">Alertas sin revisar</p>
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+                {alertasDB.length}
+              </span>
+            </div>
+            <div className="divide-y divide-red-100">
+              {(alertasDB as any[]).map(a => (
+                <div key={a.id} className="flex items-start justify-between px-5 py-3 gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-red-800 font-medium leading-tight">{a.mensaje}</p>
+                    {a.datos?.hora && (
+                      <p className="text-xs text-red-500 mt-0.5">{tiempoRelativo(a.created_at)} · {a.datos.hora}</p>
+                    )}
+                  </div>
+                  {a.datos?.descuento && (
+                    <span className="text-xs font-bold text-red-700 shrink-0 bg-red-100 px-2 py-1 rounded-lg">
+                      −{formatMXNFull(Number(a.datos.descuento))}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {cuponesUsados && cuponesUsados.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
