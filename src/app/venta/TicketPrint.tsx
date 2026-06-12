@@ -61,7 +61,7 @@ const PRINT_CSS = `
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
-    line-height: 1.35;
+    line-height: 1.45;
     padding: 0 ${MARGIN_MM}mm;
     color: #000;
     /* Fuerza a Chrome a imprimir fondos negros (las barras del logo) */
@@ -82,7 +82,7 @@ function Row({ children, style }: { children: React.ReactNode; style?: React.CSS
 }
 
 function Divider() {
-  return <div style={{ borderTop: '1px dashed #000000', margin: '5px 0' }} />
+  return <div style={{ borderTop: '1px dashed #000000', margin: '7px 0' }} />
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -252,31 +252,41 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
             {/* Logo tipográfico */}
-            <div style={{ marginBottom: '5px' }}>
+            <div style={{ marginBottom: '8px' }}>
               <div style={{ background: '#000', height: '2px' }} />
-              <div style={{ textAlign: 'center', padding: '5px 0' }}>
-                <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: 0 }}>PAPELERÍA</p>
-                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>LA MÁS</p>
-                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.05, margin: 0 }}>BARATERA</p>
+              <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: '0 0 3px' }}>PAPELERÍA</p>
+                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.1, margin: 0 }}>LA MÁS</p>
+                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.1, margin: 0 }}>BARATERA</p>
               </div>
               <div style={{ background: '#000', height: '2px' }} />
             </div>
-            <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.3, marginBottom: '2px' }}>
+            <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '5px' }}>
               {negocio.direccion1}<br />
               {negocio.direccion2}
             </p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.web}</p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>{negocio.telefono}</p>
-            <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '2px' }}>{hora}</p>
-            {(numeroTicket || clienteNombre) && (
-              <div style={{ textAlign: 'center', fontSize: '11px', marginBottom: '2px' }}>
-                {numeroTicket && <p style={{ fontWeight: 'bold' }}>Ticket: {numeroTicket}</p>}
-                {clienteNombre && (
-                  <p>
-                    {clienteNumero ? `${clienteNumero} — ` : ''}{clienteNombre}
-                  </p>
-                )}
-              </div>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '4px' }}>{negocio.web}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '7px' }}>{negocio.telefono}</p>
+
+            {/* Hora + Número de ticket en la misma línea */}
+            {numeroTicket ? (
+              <Row style={{ marginBottom: '4px' }}>
+                <span style={{ fontSize: '11px' }}>{hora}</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px' }}>#{numeroTicket}</span>
+              </Row>
+            ) : (
+              <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
+            )}
+
+            {/* Cliente */}
+            {clienteNombre && (
+              <p style={{ fontSize: '11px', marginBottom: '3px' }}>
+                {clienteNumero
+                  ? <><span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{clienteNumero}</span>{' — '}</>
+                  : null
+                }
+                {clienteNombre}
+              </p>
             )}
 
             <Divider />
@@ -291,7 +301,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               }
               const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' / ')
               return (
-                <div key={i} style={{ marginBottom: '5px' }}>
+                <div key={i} style={{ marginBottom: '7px' }}>
                   <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
                   <Row>
                     <span>{descripcion}</span>

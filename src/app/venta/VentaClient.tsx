@@ -609,6 +609,105 @@ function CarritoPanel({
   )
 }
 
+// ── Modal: identificar cliente antes del pago ──────────────────
+function ClienteLookupModal({ onConfirm }: { onConfirm: (c: Cliente | null) => void }) {
+  const [query,    setQuery]    = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [cliente,  setCliente]  = useState<Cliente | null>(null)
+  const [error,    setError]    = useState('')
+
+  async function buscar(q: string) {
+    if (!q.trim()) return
+    setBuscando(true)
+    setError('')
+    setCliente(null)
+    try {
+      const res  = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q.trim())}`)
+      const data = await res.json()
+      if (data) setCliente(data as Cliente)
+      else      setError('Cliente no encontrado')
+    } catch { setError('Error de conexión') }
+    finally   { setBuscando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Identificar cliente</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Opcional — puedes continuar sin cliente</p>
+          </div>
+          <button onClick={() => onConfirm(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de cliente o teléfono</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={query}
+                onChange={e => { setQuery(e.target.value); setError(''); setCliente(null) }}
+                onKeyDown={e => e.key === 'Enter' && buscar(query)}
+                placeholder="CLI-0001 o 5512345678"
+                autoFocus
+                className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              <button
+                onClick={() => buscar(query)}
+                disabled={buscando || !query.trim()}
+                className="h-10 px-4 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-sm font-medium rounded-xl transition-colors flex items-center justify-center"
+              >
+                {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buscar'}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-slate-500 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {cliente && (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-violet-800">{cliente.nombre}</p>
+                <p className="text-xs text-violet-500 font-mono mt-0.5">{cliente.numero_cliente} · {cliente.telefono}</p>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${
+                cliente.tipo === 'mayorista' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700'
+              }`}>
+                {cliente.tipo}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2 px-5 pb-5">
+          <button
+            onClick={() => onConfirm(null)}
+            className="flex-1 h-11 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Sin cliente
+          </button>
+          <button
+            onClick={() => onConfirm(cliente)}
+            disabled={!cliente}
+            className="flex-1 h-11 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold transition-colors"
+          >
+            {cliente ? `Confirmar` : 'Seleccionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ───────────────────────────────────────────────────────
 export default function VentaClient() {
   const [productos,      setProductos]      = useState<Producto[]>([])
@@ -622,14 +721,12 @@ export default function VentaClient() {
   const [colorPresel,     setColorPresel]      = useState<ProductoColor | null>(null)
   const [showCarrito,    setShowCarrito]    = useState(false)
   const [showCartPanel,  setShowCartPanel]  = useState(true)
-  const [showPayment,    setShowPayment]    = useState(false)
-  const [confirmando,    setConfirmando]    = useState(false)
-  const [ventaExitosa,   setVentaExitosa]   = useState<VentaExitosa | null>(null)
-  const [error,          setError]          = useState('')
-  const [clienteActual,  setClienteActual]  = useState<Cliente | null>(null)
-  const [busquedaCliente,setBusquedaCliente]= useState('')
-  const [buscandoCliente,setBuscandoCliente]= useState(false)
-  const [clienteError,   setClienteError]   = useState('')
+  const [showPayment,      setShowPayment]      = useState(false)
+  const [showClienteModal, setShowClienteModal] = useState(false)
+  const [confirmando,      setConfirmando]      = useState(false)
+  const [ventaExitosa,     setVentaExitosa]     = useState<VentaExitosa | null>(null)
+  const [error,            setError]            = useState('')
+  const [clienteActual,    setClienteActual]    = useState<Cliente | null>(null)
   const channelRef      = useRef<BroadcastChannel | null>(null)
   // Prevents the cart-empty effect from overwriting the 'complete'
   // screen on the customer display right after a sale is confirmed.
@@ -809,17 +906,10 @@ export default function VentaClient() {
     setCarrito(prev => prev.filter(i => cartKey(i) !== key))
   }
 
-  async function buscarCliente(q: string) {
-    if (!q.trim()) return
-    setBuscandoCliente(true)
-    setClienteError('')
-    try {
-      const res  = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q.trim())}`)
-      const data = await res.json()
-      if (data) setClienteActual(data as Cliente)
-      else      setClienteError('Cliente no encontrado')
-    } catch { setClienteError('Error de conexión') }
-    finally   { setBuscandoCliente(false) }
+  function handleClienteConfirm(cliente: Cliente | null) {
+    setClienteActual(cliente)
+    setShowClienteModal(false)
+    setShowPayment(true)
   }
 
   async function confirmarVenta(payment: PaymentData) {
@@ -1008,7 +1098,6 @@ export default function VentaClient() {
     })
     setCarrito([])
     setClienteActual(null)
-    setBusquedaCliente('')
     setShowPayment(false)
     setConfirmando(false)
     fetchProductos()
@@ -1163,44 +1252,6 @@ export default function VentaClient() {
           </div>
         </div>
 
-        {/* Widget de cliente */}
-        <div className="border-b border-slate-100 px-3 py-2">
-          {clienteActual ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">Cliente</p>
-                <p className="text-sm font-semibold text-violet-700 leading-tight">{clienteActual.nombre}</p>
-                <p className="text-xs text-slate-400 font-mono">{clienteActual.numero_cliente}</p>
-              </div>
-              <button
-                onClick={() => { setClienteActual(null); setBusquedaCliente(''); setClienteError('') }}
-                className="text-xs text-slate-400 hover:text-red-500 p-1"
-              >✕</button>
-            </div>
-          ) : (
-            <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">Cliente (opcional)</p>
-              <div className="flex gap-1">
-                <input
-                  value={busquedaCliente}
-                  onChange={e => { setBusquedaCliente(e.target.value); setClienteError('') }}
-                  onKeyDown={e => e.key === 'Enter' && buscarCliente(busquedaCliente)}
-                  placeholder="N° o teléfono"
-                  className="flex-1 text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400"
-                />
-                <button
-                  onClick={() => buscarCliente(busquedaCliente)}
-                  disabled={buscandoCliente}
-                  className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded transition-colors"
-                >
-                  {buscandoCliente ? '…' : 'Buscar'}
-                </button>
-              </div>
-              {clienteError && <p className="text-xs text-red-500 mt-1">{clienteError}</p>}
-            </div>
-          )}
-        </div>
-
         {error && (
           <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
             <AlertTriangle className="w-4 h-4 shrink-0" />{error}
@@ -1212,7 +1263,7 @@ export default function VentaClient() {
           onSetCajas={setCantidadCajas}
           onSetPiezas={setCantidadPiezas}
           onEliminar={eliminarDelCarrito}
-          onConfirmar={() => setShowPayment(true)}
+          onConfirmar={() => setShowClienteModal(true)}
           confirmando={confirmando}
         />
       </div>}
@@ -1273,7 +1324,7 @@ export default function VentaClient() {
               onSetCajas={setCantidadCajas}
               onSetPiezas={setCantidadPiezas}
               onEliminar={eliminarDelCarrito}
-              onConfirmar={() => { setShowPayment(true); setShowCarrito(false) }}
+              onConfirmar={() => { setShowClienteModal(true); setShowCarrito(false) }}
               confirmando={confirmando}
             />
           </div>
@@ -1290,6 +1341,11 @@ export default function VentaClient() {
         onClose={() => { setAgregarModalProd(null); setColorPresel(null) }}
         onConfirm={confirmarAgregarAlCarrito}
       />
+    )}
+
+    {/* ── Cliente lookup before payment ───────────────────── */}
+    {showClienteModal && (
+      <ClienteLookupModal onConfirm={handleClienteConfirm} />
     )}
 
     {/* ── Payment modal ────────────────────────────────────── */}
