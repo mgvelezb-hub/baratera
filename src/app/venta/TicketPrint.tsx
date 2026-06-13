@@ -140,7 +140,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
     '<!DOCTYPE html><html><head>' +
     '<meta charset="utf-8"><title>Ticket</title>' +
     '<style>' + css + '</style>' +
-    '</head><body>' + bodyHtml + '</body></html>'
+    '</head><body><div id="ticket-root">' + bodyHtml + '</div></body></html>'
   )
   doc.close()
 
@@ -182,8 +182,8 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
       )
     )
 
-    // Paso 3: medir el contenido real (body se expande al viewport del iframe, no sirve).
-    const contentEl = doc.body.firstElementChild as HTMLElement | null
+    // Paso 3: medir el contenido real via wrapper (body se expande al viewport del iframe).
+    const contentEl = doc.getElementById('ticket-root') as HTMLElement | null
     const contentPx = contentEl ? contentEl.offsetHeight : doc.body.scrollHeight
     const heightMm  = Math.ceil(contentPx * MM_PER_PX) + BUFFER_MM
 
@@ -386,8 +386,8 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
                 la forma redondeada del logo; imprime nítido en B/N. */}
             <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1.2 }}>
               <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
-              <p style={{ fontSize: '22px', fontWeight: 600, margin: '0', letterSpacing: '-0.5px' }}>baratera</p>
-              <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>papelería</p>
+              <p style={{ fontSize: '23px', fontWeight: 700, margin: '0', letterSpacing: '-0.5px' }}>baratera</p>
+              <p style={{ fontSize: '29px', fontWeight: 600, margin: 0 }}>papelería</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
