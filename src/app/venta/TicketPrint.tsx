@@ -368,7 +368,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
           >
             <div style={{ textAlign: 'center', marginBottom: '6px' }}>
               <p style={{ fontWeight: 'bold', fontSize: '13px' }}>LA MAS BARATERA</p>
-              <p style={{ fontSize: '11px' }}>P A P E L E R I A</p>
+              <p style={{ fontSize: '11px' }}>PAPELERIA</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
