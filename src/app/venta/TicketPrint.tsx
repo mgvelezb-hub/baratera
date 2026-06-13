@@ -387,7 +387,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1.2 }}>
               <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
               <p style={{ fontSize: '23px', fontWeight: 600, margin: '0'}}>baratera</p>
-              <p style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>papelería</p>
+              <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>papelería</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
