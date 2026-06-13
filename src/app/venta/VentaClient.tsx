@@ -26,13 +26,14 @@ function cartKey(item: CartItem): string {
 }
 
 interface VentaExitosa {
-  items:          CartItem[]
-  total:          number
-  hora:           string
-  payment:        PaymentData
-  numeroTicket?:  string | null
-  clienteNombre?: string | null
-  clienteNumero?: string | null
+  items:             CartItem[]
+  total:             number
+  hora:              string
+  payment:           PaymentData
+  numeroTicket?:     string | null
+  clienteNombre?:    string | null
+  clienteNumero?:    string | null
+  clienteTelefono?:  string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -1235,13 +1236,14 @@ export default function VentaClient() {
     // customer display shows the 'complete' screen.
     saleJustDoneRef.current = true
     setVentaExitosa({
-      items:         [...carrito],
-      total:         ventaTotal,
+      items:            [...carrito],
+      total:            ventaTotal,
       hora,
       payment,
       numeroTicket,
-      clienteNombre: clienteActual?.nombre ?? null,
-      clienteNumero: clienteActual?.numero_cliente ?? null,
+      clienteNombre:    clienteActual?.nombre          ?? null,
+      clienteNumero:    clienteActual?.numero_cliente  ?? null,
+      clienteTelefono:  clienteActual?.telefono        ?? null,
     })
     setCarrito([])
     setClienteActual(null)
@@ -1517,6 +1519,7 @@ export default function VentaClient() {
         numeroTicket={ventaExitosa.numeroTicket}
         clienteNombre={ventaExitosa.clienteNombre}
         clienteNumero={ventaExitosa.clienteNumero}
+        clienteTelefono={ventaExitosa.clienteTelefono}
       />
     )}
     </>

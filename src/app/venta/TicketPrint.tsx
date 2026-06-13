@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Printer, Mail, X } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { Printer, Mail, X, Share2, Download, Loader2, Copy } from 'lucide-react'
 import { formatMXN, pluralUnidad } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
 import { useConfig } from '@/lib/hooks/useConfig'
@@ -19,18 +19,19 @@ export interface TicketItem {
 }
 
 interface Props {
-  items:          TicketItem[]
-  total:          number
-  payment:        PaymentData
-  hora:           string
-  onClose:        () => void
-  onNuevaVenta:   () => void
-  numeroTicket?:  string | null
-  clienteNombre?: string | null
-  clienteNumero?: string | null
+  items:             TicketItem[]
+  total:             number
+  payment:           PaymentData
+  hora:              string
+  onClose:           () => void
+  onNuevaVenta:      () => void
+  numeroTicket?:     string | null
+  clienteNombre?:    string | null
+  clienteNumero?:    string | null
+  clienteTelefono?:  string | null
 }
 
-type Tab = 'imprimir' | 'correo'
+type Tab = 'imprimir' | 'correo' | 'compartir'
 
 // ════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN DE IMPRESIÓN — todo lo ajustable vive aquí.
@@ -174,13 +175,18 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   }
 }
 
-export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero }: Props) {
+export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero, clienteTelefono }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
   const [tab,          setTab]          = useState<Tab>('imprimir')
   const [email,        setEmail]        = useState('')
   const [emailSending, setEmailSending] = useState(false)
   const [emailSent,    setEmailSent]    = useState(false)
   const [emailError,   setEmailError]   = useState('')
+  const [pdfUrl,       setPdfUrl]       = useState<string | null>(null)
+  const [pdfLoading,   setPdfLoading]   = useState(false)
+  const [pdfError,     setPdfError]     = useState('')
+  const [copied,       setCopied]       = useState(false)
+  const pdfFetched = useRef(false)
 
   const metodoLabel =
     payment.metodo === 'efectivo'        ? 'Efectivo'
@@ -228,9 +234,51 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   const { config } = useConfig()
   const negocio = config.negocio
 
+  // ── PDF generation for WhatsApp share ───────────────────────
+  useEffect(() => {
+    if (tab !== 'compartir' || pdfFetched.current) return
+    pdfFetched.current = true
+    setPdfLoading(true)
+    setPdfError('')
+
+    fetch('/api/ventas/ticket-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ items, total, payment, hora, numeroTicket, clienteNombre, clienteNumero, negocio }),
+    })
+      .then(async res => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Error al generar PDF')
+        setPdfUrl(data.url as string)
+      })
+      .catch(err => {
+        setPdfError(err instanceof Error ? err.message : 'Error al generar PDF')
+        pdfFetched.current = false // allow retry
+      })
+      .finally(() => setPdfLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  function reintentarPDF() {
+    pdfFetched.current = false
+    setPdfUrl(null)
+    setPdfError('')
+    // toggle tab to re-trigger the effect
+    setTab('imprimir')
+    setTimeout(() => setTab('compartir'), 0)
+  }
+
+  async function copiarEnlace() {
+    if (!pdfUrl) return
+    await navigator.clipboard.writeText(pdfUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const TABS = [
-    { id: 'imprimir', label: 'Imprimir', Icon: Printer },
-    { id: 'correo',   label: 'Correo',   Icon: Mail    },
+    { id: 'imprimir',   label: 'Imprimir',   Icon: Printer },
+    { id: 'correo',     label: 'Correo',     Icon: Mail    },
+    { id: 'compartir',  label: 'WhatsApp',   Icon: Share2  },
   ] as const
 
   return (
@@ -368,7 +416,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
         <div className="border-t border-slate-100 p-4 space-y-3">
 
           {/* Tab selector */}
-          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
             {TABS.map(({ id, label, Icon }) => (
               <button
                 key={id}
@@ -424,6 +472,61 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               )}
               {emailError && (
                 <p className="text-xs text-red-500 text-center">{emailError}</p>
+              )}
+            </div>
+          )}
+
+          {/* WhatsApp / Compartir */}
+          {tab === 'compartir' && (
+            <div className="space-y-2">
+              {pdfLoading && (
+                <div className="flex items-center justify-center gap-2 py-4 text-slate-500 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generando PDF…
+                </div>
+              )}
+              {pdfError && (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-500 text-center">{pdfError}</p>
+                  <button
+                    onClick={reintentarPDF}
+                    className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+              {pdfUrl && (
+                <div className="space-y-2">
+                  <a
+                    href={pdfUrl}
+                    download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar PDF
+                  </a>
+                  {clienteTelefono ? (
+                    <a
+                      href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full h-11 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      Enviar por WhatsApp
+                    </a>
+                  ) : (
+                    <button
+                      onClick={copiarEnlace}
+                      className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                      {copied ? '¡Copiado!' : 'Copiar enlace'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
