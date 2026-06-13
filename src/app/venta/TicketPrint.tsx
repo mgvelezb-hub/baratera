@@ -186,6 +186,8 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   const [pdfLoading,   setPdfLoading]   = useState(false)
   const [pdfError,     setPdfError]     = useState('')
   const [copied,       setCopied]       = useState(false)
+  const [waStatus,     setWaStatus]     = useState<'idle' | 'sending' | 'sent' | 'error' | 'fallback'>('idle')
+  const [waError,      setWaError]      = useState('')
   const pdfFetched = useRef(false)
 
   const metodoLabel =
@@ -249,7 +251,27 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? 'Error al generar PDF')
-        setPdfUrl(data.url as string)
+        const url = data.url as string
+        setPdfUrl(url)
+
+        // Auto-send via Cloud API when phone is available
+        if (clienteTelefono) {
+          setWaStatus('sending')
+          try {
+            const waRes  = await fetch('/api/ventas/ticket-whatsapp', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ pdfUrl: url, telefono: clienteTelefono, clienteNombre }),
+            })
+            const waData = await waRes.json()
+            if (waRes.status === 503) { setWaStatus('fallback'); return } // API not configured → manual
+            if (!waRes.ok) throw new Error(waData.error ?? 'Error al enviar')
+            setWaStatus('sent')
+          } catch (err) {
+            setWaError(err instanceof Error ? err.message : 'Error al enviar')
+            setWaStatus('error')
+          }
+        }
       })
       .catch(err => {
         setPdfError(err instanceof Error ? err.message : 'Error al generar PDF')
@@ -263,9 +285,30 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     pdfFetched.current = false
     setPdfUrl(null)
     setPdfError('')
-    // toggle tab to re-trigger the effect
+    setWaStatus('idle')
+    setWaError('')
     setTab('imprimir')
     setTimeout(() => setTab('compartir'), 0)
+  }
+
+  async function reenviarWhatsApp() {
+    if (!pdfUrl || !clienteTelefono) return
+    setWaStatus('sending')
+    setWaError('')
+    try {
+      const waRes  = await fetch('/api/ventas/ticket-whatsapp', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ pdfUrl, telefono: clienteTelefono, clienteNombre }),
+      })
+      const waData = await waRes.json()
+      if (waRes.status === 503) { setWaStatus('fallback'); return }
+      if (!waRes.ok) throw new Error(waData.error ?? 'Error al enviar')
+      setWaStatus('sent')
+    } catch (err) {
+      setWaError(err instanceof Error ? err.message : 'Error al enviar')
+      setWaStatus('error')
+    }
   }
 
   async function copiarEnlace() {
@@ -479,63 +522,101 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           {/* WhatsApp / Compartir */}
           {tab === 'compartir' && (
             <div className="space-y-2">
+
               {/* Destino */}
               {clienteTelefono && (
                 <p className="text-xs text-slate-500 text-center">
-                  Enviando a{' '}
                   <span className="font-mono font-semibold text-slate-700">{clienteTelefono}</span>
                   {clienteNombre ? ` · ${clienteNombre}` : ''}
                 </p>
               )}
 
+              {/* Preparando PDF */}
               {pdfLoading && (
                 <div className="flex items-center justify-center gap-2 py-3 text-slate-500 text-sm">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Preparando ticket…
                 </div>
               )}
+
+              {/* Enviando por Cloud API */}
+              {!pdfLoading && waStatus === 'sending' && (
+                <div className="flex items-center justify-center gap-2 py-3 text-green-600 text-sm font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Enviando por WhatsApp…
+                </div>
+              )}
+
+              {/* Enviado correctamente */}
+              {waStatus === 'sent' && (
+                <div className="flex items-center justify-center gap-2 py-3 bg-green-50 rounded-xl text-green-700 text-sm font-semibold">
+                  ✓ Ticket enviado por WhatsApp
+                </div>
+              )}
+
+              {/* Error generando PDF */}
               {pdfError && (
                 <div className="space-y-2">
                   <p className="text-xs text-red-500 text-center">{pdfError}</p>
-                  <button
-                    onClick={reintentarPDF}
-                    className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
+                  <button onClick={reintentarPDF}
+                    className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     Reintentar
                   </button>
                 </div>
               )}
-              {pdfUrl && (
+
+              {/* Error de Cloud API → opciones manuales */}
+              {waStatus === 'error' && pdfUrl && (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-500 text-center">{waError}</p>
+                  <button onClick={reenviarWhatsApp}
+                    className="w-full h-10 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold transition-colors">
+                    Reintentar envío
+                  </button>
+                  {clienteTelefono && (
+                    <a
+                      href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="w-full h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
+                    >
+                      Abrir WhatsApp manualmente
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* API no configurada o sin teléfono → manual wa.me */}
+              {(waStatus === 'fallback' || (!clienteTelefono && pdfUrl && waStatus === 'idle')) && (
                 <div className="space-y-2">
                   {clienteTelefono ? (
                     <a
                       href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target="_blank" rel="noopener noreferrer"
                       className="w-full h-12 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition-colors"
                     >
                       Enviar por WhatsApp
                     </a>
                   ) : (
-                    <button
-                      onClick={copiarEnlace}
-                      className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
-                    >
+                    <button onClick={copiarEnlace}
+                      className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors">
                       <Copy className="w-4 h-4" />
                       {copied ? '¡Copiado!' : 'Copiar enlace'}
                     </button>
                   )}
-                  <a
-                    href={pdfUrl}
-                    download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Descargar PDF
-                  </a>
                 </div>
+              )}
+
+              {/* Descargar PDF — siempre visible cuando está listo */}
+              {pdfUrl && waStatus !== 'sending' && (
+                <a
+                  href={pdfUrl}
+                  download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Descargar PDF
+                </a>
               )}
             </div>
           )}
