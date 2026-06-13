@@ -167,6 +167,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
       ])
     } catch { /* ok */ }
     try { await doc.fonts.ready } catch { /* ok */ }
+    await new Promise(r => setTimeout(r, 400))
 
     // Paso 2b: esperar a que TODAS las imágenes (logo) terminen de
     // cargar. Si medimos antes, el alto sale mal y el logo no imprime.
@@ -385,7 +386,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
                 la forma redondeada del logo; imprime nítido en B/N. */}
             <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1.2 }}>
               <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
-              <p style={{ fontSize: '34px', fontWeight: 700, margin: '0', letterSpacing: '-0.5px' }}>baratera</p>
+              <p style={{ fontSize: '28px', fontWeight: 700, margin: '0', letterSpacing: '-0.5px' }}>baratera</p>
               <p style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>papelería</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
