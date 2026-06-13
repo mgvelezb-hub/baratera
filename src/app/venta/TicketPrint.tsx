@@ -215,12 +215,6 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
-  // URL absoluta del logo — necesaria para que el <img> cargue dentro
-  // del iframe de impresión (un path relativo no resuelve ahí).
-  const logoUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/logo-baratera.png`
-    : '/logo-baratera.png'
-
   function handlePrint(): void {
     const node = ticketRef.current
     if (!node) return
@@ -376,13 +370,16 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* Logo */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoUrl}
-              alt="La Más Baratera"
-              style={{ display: 'block', width: '70%', maxWidth: '170px', margin: '0 auto 8px', borderRadius: '8px' }}
-            />
+            {/* Logo tipográfico — sin color, para que imprima nítido en B/N */}
+            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+              <div style={{ background: '#000', height: '2px' }} />
+              <div style={{ padding: '7px 0' }}>
+                <p style={{ fontSize: '12px', fontWeight: 'bold', lineHeight: 1.1, margin: 0, letterSpacing: '1px' }}>LA MÁS</p>
+                <p style={{ fontSize: '22px', fontWeight: 'bold', lineHeight: 1, margin: '1px 0', letterSpacing: '0.5px' }}>BARATERA</p>
+                <p style={{ fontSize: '14px', fontWeight: 'bold', lineHeight: 1.1, margin: 0, letterSpacing: '3px' }}>PAPELERÍA</p>
+              </div>
+              <div style={{ background: '#000', height: '2px' }} />
+            </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
               {negocio.direccion2}

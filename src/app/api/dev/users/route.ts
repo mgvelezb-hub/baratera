@@ -22,6 +22,7 @@ export async function GET() {
   const result = users.map(u => ({
     id:             u.id,
     email:          u.email ?? '',
+    nombre:         (u.user_metadata as Record<string, string> | null)?.nombre ?? null,
     role:           (u.app_metadata as Record<string, string> | null)?.role ?? null,
     lastSignIn:     u.last_sign_in_at ?? null,
     createdAt:      u.created_at,
@@ -41,10 +42,21 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { userId, role } = await req.json()
+  const { userId, role, nombre } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // ── Asignar nombre (user_metadata) ──────────────────────────────
+  if (nombre !== undefined) {
+    const limpio = String(nombre).trim()
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      user_metadata: { nombre: limpio || null },
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await logAudit('usuario.nombre', { userId, nombre: limpio }, caller.email)
+    return NextResponse.json({ ok: true, userId, nombre: limpio })
+  }
 
   // Validar contra la tabla de roles dinámicos; fallback a la lista legacy
   // si la migración aún no corre en Supabase.

@@ -1195,8 +1195,10 @@ export default function VentaClient() {
     const yyyy       = ahora.getFullYear()
     const hhmmss     = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     const fecha      = `${dd}/${mm}/${yyyy} ${hhmmss}`
-    // Nombre del cajero: prefijo del correo del usuario logueado
-    const cajero     = user?.email ? user.email.split('@')[0].replace(/[._-]/g, ' ').toUpperCase() : null
+    // Nombre del cajero: nombre asignado en Configuraciones (user_metadata).
+    // Si no tiene nombre asignado, no se muestra (evita "user1", "dev", etc.)
+    const nombreCajero = (user?.user_metadata as Record<string, string> | undefined)?.nombre
+    const cajero       = nombreCajero?.trim() ? nombreCajero.trim().toUpperCase() : null
 
     // Auto-upgrade a frecuente: si el cliente normal acumula ≥5 compras en el mes
     if (clienteActual && clienteActual.tipo === 'normal') {

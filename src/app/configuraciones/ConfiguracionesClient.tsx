@@ -17,6 +17,7 @@ import { CONFIG_DEFAULTS, type AppConfig } from '@/lib/config'
 interface UserInfo {
   id:             string
   email:          string
+  nombre:         string | null
   role:           string | null
   lastSignIn:     string | null
   createdAt:      string
@@ -72,6 +73,7 @@ export default function ConfiguracionesClient() {
   const [loadingUsers,  setLoadingUsers]  = useState(true)
   const [loadingStats,  setLoadingStats]  = useState(false)
   const [roleLoading,   setRoleLoading]   = useState<string | null>(null)
+  const [nameLoading,   setNameLoading]   = useState<string | null>(null)
   const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
   const [simRole,       setSimRole]       = useState('')
 
@@ -177,6 +179,23 @@ export default function ConfiguracionesClient() {
       showToast((await res.json()).error ?? 'Error al actualizar', false)
     }
     setRoleLoading(null)
+  }
+
+  // ── Assign name ───────────────────────────────────────────────
+  async function saveName(userId: string, nombre: string) {
+    setNameLoading(userId)
+    const res = await fetch('/api/dev/users', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, nombre }),
+    })
+    if (res.ok) {
+      showToast('Nombre actualizado', true)
+      await fetchUsers()
+    } else {
+      showToast((await res.json()).error ?? 'Error al actualizar', false)
+    }
+    setNameLoading(null)
   }
 
   // ── Reset module ──────────────────────────────────────────────
@@ -314,7 +333,7 @@ export default function ConfiguracionesClient() {
                       color: 'bg-emerald-100 text-emerald-700',
                     }
                   : null)
-                const initial = (u.email ?? '?')[0].toUpperCase()
+                const initial = (u.nombre || u.email || '?')[0].toUpperCase()
                 const lastSeen = u.lastSignIn
                   ? new Date(u.lastSignIn).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
                   : 'Nunca'
@@ -326,10 +345,22 @@ export default function ConfiguracionesClient() {
                       {initial}
                     </div>
 
-                    {/* Info */}
+                    {/* Info: nombre editable + email */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{u.email}</p>
-                      <p className="text-xs text-slate-400">Último acceso: {lastSeen}</p>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          defaultValue={u.nombre ?? ''}
+                          placeholder="Asignar nombre…"
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                          onBlur={e => {
+                            const v = e.target.value.trim()
+                            if (v !== (u.nombre ?? '')) saveName(u.id, v)
+                          }}
+                          className="text-sm font-medium text-slate-900 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-violet-400 focus:outline-none w-full max-w-[200px] py-0.5"
+                        />
+                        {nameLoading === u.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{u.email} · {lastSeen}</p>
                     </div>
 
                     {/* Role badge */}
