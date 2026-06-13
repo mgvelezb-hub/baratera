@@ -54,8 +54,8 @@ type Tab = 'imprimir' | 'correo' | 'compartir'
 //              1 pulgada = 96px = 25.4mm. NO la cambies.
 // ════════════════════════════════════════════════════════════════
 const PAPER_MM  = 58
-const MARGIN_MM = 4
-const BUFFER_MM = 8
+const MARGIN_MM = 5
+const BUFFER_MM = 12
 const MM_PER_PX = 25.4 / 96               // ≈ 0.2646 mm por píxel
 const PAPER_PX  = Math.round(PAPER_MM / MM_PER_PX) // ≈ 219 px
 
@@ -127,8 +127,8 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.cssText =
-    'position:fixed;right:0;bottom:0;border:0;visibility:hidden;' +
-    `width:${PAPER_PX}px;height:0;`
+    'position:fixed;right:0;bottom:0;border:0;visibility:hidden;overflow:hidden;' +
+    `width:${PAPER_PX}px;height:3000px;`
   document.body.appendChild(iframe)
 
   const doc = iframe.contentDocument
