@@ -182,9 +182,9 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
       )
     )
 
-    // Paso 3: medir. El body ya mide 58mm de ancho por el CSS,
-    // así que scrollHeight es la altura REAL que tendrá en papel.
-    const contentPx = doc.body.scrollHeight
+    // Paso 3: medir el contenido real (body se expande al viewport del iframe, no sirve).
+    const contentEl = doc.body.firstElementChild as HTMLElement | null
+    const contentPx = contentEl ? contentEl.offsetHeight : doc.body.scrollHeight
     const heightMm  = Math.ceil(contentPx * MM_PER_PX) + BUFFER_MM
 
     // Paso 4: definir la "hoja" del tamaño exacto del ticket.
@@ -386,7 +386,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
                 la forma redondeada del logo; imprime nítido en B/N. */}
             <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1.2 }}>
               <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
-              <p style={{ fontSize: '23px', fontWeight: 600, margin: '0'}}>baratera</p>
+              <p style={{ fontSize: '22px', fontWeight: 600, margin: '0', letterSpacing: '-0.5px' }}>baratera</p>
               <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>papelería</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
