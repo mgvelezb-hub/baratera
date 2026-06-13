@@ -188,6 +188,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
   const [copied,       setCopied]       = useState(false)
   const [waStatus,     setWaStatus]     = useState<'idle' | 'sending' | 'sent' | 'error' | 'fallback'>('idle')
   const [waError,      setWaError]      = useState('')
+  const [phoneInput,   setPhoneInput]   = useState('')
   const pdfFetched = useRef(false)
 
   const metodoLabel =
@@ -523,101 +524,125 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           {tab === 'compartir' && (
             <div className="space-y-2">
 
-              {/* Destino */}
+              {/* ── Cliente con teléfono → envío automático vía Cloud API ── */}
               {clienteTelefono && (
-                <p className="text-xs text-slate-500 text-center">
-                  <span className="font-mono font-semibold text-slate-700">{clienteTelefono}</span>
-                  {clienteNombre ? ` · ${clienteNombre}` : ''}
-                </p>
-              )}
+                <>
+                  <p className="text-xs text-slate-500 text-center">
+                    <span className="font-mono font-semibold text-slate-700">{clienteTelefono}</span>
+                    {clienteNombre ? ` · ${clienteNombre}` : ''}
+                  </p>
 
-              {/* Preparando PDF */}
-              {pdfLoading && (
-                <div className="flex items-center justify-center gap-2 py-3 text-slate-500 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Preparando ticket…
-                </div>
-              )}
-
-              {/* Enviando por Cloud API */}
-              {!pdfLoading && waStatus === 'sending' && (
-                <div className="flex items-center justify-center gap-2 py-3 text-green-600 text-sm font-medium">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Enviando por WhatsApp…
-                </div>
-              )}
-
-              {/* Enviado correctamente */}
-              {waStatus === 'sent' && (
-                <div className="flex items-center justify-center gap-2 py-3 bg-green-50 rounded-xl text-green-700 text-sm font-semibold">
-                  ✓ Ticket enviado por WhatsApp
-                </div>
-              )}
-
-              {/* Error generando PDF */}
-              {pdfError && (
-                <div className="space-y-2">
-                  <p className="text-xs text-red-500 text-center">{pdfError}</p>
-                  <button onClick={reintentarPDF}
-                    className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                    Reintentar
-                  </button>
-                </div>
-              )}
-
-              {/* Error de Cloud API → opciones manuales */}
-              {waStatus === 'error' && pdfUrl && (
-                <div className="space-y-2">
-                  <p className="text-xs text-red-500 text-center">{waError}</p>
-                  <button onClick={reenviarWhatsApp}
-                    className="w-full h-10 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold transition-colors">
-                    Reintentar envío
-                  </button>
-                  {clienteTelefono && (
-                    <a
-                      href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
+                  {pdfLoading && (
+                    <div className="flex items-center justify-center gap-2 py-3 text-slate-500 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />Preparando ticket…
+                    </div>
+                  )}
+                  {!pdfLoading && waStatus === 'sending' && (
+                    <div className="flex items-center justify-center gap-2 py-3 text-green-600 text-sm font-medium">
+                      <Loader2 className="w-4 h-4 animate-spin" />Enviando por WhatsApp…
+                    </div>
+                  )}
+                  {waStatus === 'sent' && (
+                    <div className="flex items-center justify-center gap-2 py-3 bg-green-50 rounded-xl text-green-700 text-sm font-semibold">
+                      ✓ Ticket enviado por WhatsApp
+                    </div>
+                  )}
+                  {pdfError && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-500 text-center">{pdfError}</p>
+                      <button onClick={reintentarPDF}
+                        className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                        Reintentar
+                      </button>
+                    </div>
+                  )}
+                  {waStatus === 'error' && pdfUrl && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-500 text-center">{waError}</p>
+                      <button onClick={reenviarWhatsApp}
+                        className="w-full h-10 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold transition-colors">
+                        Reintentar envío
+                      </button>
+                      <a href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="w-full h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors">
+                        Abrir WhatsApp manualmente
+                      </a>
+                    </div>
+                  )}
+                  {waStatus === 'fallback' && pdfUrl && (
+                    <a href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
                       target="_blank" rel="noopener noreferrer"
-                      className="w-full h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
-                    >
-                      Abrir WhatsApp manualmente
+                      className="w-full h-12 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition-colors">
+                      Enviar por WhatsApp
                     </a>
                   )}
-                </div>
+                  {pdfUrl && waStatus !== 'sending' && (
+                    <a href={pdfUrl} download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors">
+                      <Download className="w-3.5 h-3.5" />Descargar PDF
+                    </a>
+                  )}
+                </>
               )}
 
-              {/* API no configurada o sin teléfono → manual wa.me */}
-              {(waStatus === 'fallback' || (!clienteTelefono && pdfUrl && waStatus === 'idle')) && (
-                <div className="space-y-2">
-                  {clienteTelefono ? (
+              {/* ── Sin teléfono → pedir número para abrir WA ── */}
+              {!clienteTelefono && (
+                <>
+                  {pdfLoading && (
+                    <div className="flex items-center justify-center gap-2 py-2 text-slate-500 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />Preparando ticket…
+                    </div>
+                  )}
+                  {pdfError && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-500 text-center">{pdfError}</p>
+                      <button onClick={reintentarPDF}
+                        className="w-full h-10 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                        Reintentar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Número manual */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                      Número WhatsApp del cliente
+                    </label>
+                    <input
+                      type="tel"
+                      value={phoneInput}
+                      onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="5512345678"
+                      maxLength={10}
+                      className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-mono text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  {phoneInput.length === 10 && pdfUrl && (
                     <a
-                      href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
+                      href={`https://wa.me/52${phoneInput}?text=${encodeURIComponent(`Hola, aquí está tu ticket de compra de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
                       target="_blank" rel="noopener noreferrer"
                       className="w-full h-12 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition-colors"
                     >
-                      Enviar por WhatsApp
+                      Abrir WhatsApp
                     </a>
-                  ) : (
-                    <button onClick={copiarEnlace}
-                      className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors">
-                      <Copy className="w-4 h-4" />
-                      {copied ? '¡Copiado!' : 'Copiar enlace'}
-                    </button>
                   )}
-                </div>
+                  {phoneInput.length === 10 && pdfLoading && (
+                    <p className="text-xs text-slate-400 text-center">Listo en un momento…</p>
+                  )}
+
+                  {pdfUrl && (
+                    <a href={pdfUrl} download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors">
+                      <Download className="w-3.5 h-3.5" />Descargar PDF
+                    </a>
+                  )}
+                </>
               )}
 
-              {/* Descargar PDF — siempre visible cuando está listo */}
-              {pdfUrl && waStatus !== 'sending' && (
-                <a
-                  href={pdfUrl}
-                  download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Descargar PDF
-                </a>
-              )}
             </div>
           )}
 
