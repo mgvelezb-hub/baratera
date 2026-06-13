@@ -177,7 +177,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
 
 export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero, clienteTelefono }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
-  const [tab,          setTab]          = useState<Tab>('imprimir')
+  const [tab,          setTab]          = useState<Tab>(clienteTelefono ? 'compartir' : 'imprimir')
   const [email,        setEmail]        = useState('')
   const [emailSending, setEmailSending] = useState(false)
   const [emailSent,    setEmailSent]    = useState(false)
@@ -479,10 +479,19 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           {/* WhatsApp / Compartir */}
           {tab === 'compartir' && (
             <div className="space-y-2">
+              {/* Destino */}
+              {clienteTelefono && (
+                <p className="text-xs text-slate-500 text-center">
+                  Enviando a{' '}
+                  <span className="font-mono font-semibold text-slate-700">{clienteTelefono}</span>
+                  {clienteNombre ? ` · ${clienteNombre}` : ''}
+                </p>
+              )}
+
               {pdfLoading && (
-                <div className="flex items-center justify-center gap-2 py-4 text-slate-500 text-sm">
+                <div className="flex items-center justify-center gap-2 py-3 text-slate-500 text-sm">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generando PDF…
+                  Preparando ticket…
                 </div>
               )}
               {pdfError && (
@@ -498,22 +507,12 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               )}
               {pdfUrl && (
                 <div className="space-y-2">
-                  <a
-                    href={pdfUrl}
-                    download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full h-11 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Descargar PDF
-                  </a>
                   {clienteTelefono ? (
                     <a
                       href={`https://wa.me/52${clienteTelefono}?text=${encodeURIComponent(`Hola${clienteNombre ? ` ${clienteNombre}` : ''}, aquí está tu ticket de Papelería La Más Baratera 🛍️\n\n${pdfUrl}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full h-11 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                      className="w-full h-12 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition-colors"
                     >
                       Enviar por WhatsApp
                     </a>
@@ -526,6 +525,16 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
                       {copied ? '¡Copiado!' : 'Copiar enlace'}
                     </button>
                   )}
+                  <a
+                    href={pdfUrl}
+                    download={`ticket-${numeroTicket ?? 'baratera'}.pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-10 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Descargar PDF
+                  </a>
                 </div>
               )}
             </div>
