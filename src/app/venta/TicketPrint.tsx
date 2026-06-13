@@ -62,21 +62,17 @@ const PAPER_PX  = Math.round(PAPER_MM / MM_PER_PX) // ≈ 219 px
 // El @page (tamaño de hoja) se inyecta dinámicamente en openPrint
 // con el alto exacto del contenido ya medido.
 const PRINT_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: ${PAPER_MM}mm; height: auto !important; }
+  html, body { width: ${PAPER_MM}mm; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
-    line-height: 1.45;
+    line-height: 1.4;
     padding: 0 ${MARGIN_MM}mm;
     color: #000;
-    /* Fuerza a Chrome a imprimir fondos negros (las barras del logo) */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  /* Evita que un texto largo SIN espacios (URLs, códigos) se salga
-     del papel y rompa el layout: lo parte donde sea necesario. */
   p, div, span { overflow-wrap: anywhere; }
 `
 
@@ -127,8 +123,8 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.cssText =
-    'position:fixed;right:0;bottom:0;border:0;visibility:hidden;overflow:hidden;' +
-    `width:${PAPER_PX}px;height:3000px;`
+    'position:fixed;left:-9999px;top:0;border:0;' +
+    `width:${PAPER_PX}px;height:1px;`
   document.body.appendChild(iframe)
 
   const doc = iframe.contentDocument
@@ -140,7 +136,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
     '<!DOCTYPE html><html><head>' +
     '<meta charset="utf-8"><title>Ticket</title>' +
     '<style>' + css + '</style>' +
-    '</head><body><div id="ticket-root">' + bodyHtml + '</div></body></html>'
+    '</head><body>' + bodyHtml + '</body></html>'
   )
   doc.close()
 
@@ -156,18 +152,8 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   setTimeout(cleanup, 60_000)
 
   const go = async () => {
-    // Paso 2: esperar fuentes. Forzamos la carga de Fredoka (el wordmark
-    // del logo) antes de medir; si no, fonts.ready puede resolver antes
-    // de que la fuente se solicite y el logo imprimiría con el fallback.
-    try {
-      await Promise.all([
-        doc.fonts.load('700 34px "Fredoka"'),
-        doc.fonts.load('600 22px "Fredoka"'),
-        doc.fonts.load('500 18px "Fredoka"'),
-      ])
-    } catch { /* ok */ }
-    try { await doc.fonts.ready } catch { /* ok */ }
-    await new Promise(r => setTimeout(r, 400))
+    // Solo fuentes del sistema — sin esperas de red.
+    await new Promise(r => setTimeout(r, 120))
 
     // Paso 2b: esperar a que TODAS las imágenes (logo) terminen de
     // cargar. Si medimos antes, el alto sale mal y el logo no imprime.
@@ -182,7 +168,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
       )
     )
 
-    // Paso 3: medir el contenido real via wrapper (body se expande al viewport del iframe)
+    // Paso 3: iframe de 1px → contenido desborda → scrollHeight = alto real del ticket.
     const contentPx = doc.body.scrollHeight
     const heightMm  = Math.ceil(contentPx * MM_PER_PX) + BUFFER_MM
 
@@ -380,13 +366,9 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* Wordmark redondeado del logo — negro, sin color ni fondo.
-                Usa la tipografía Fredoka (cargada vía @import) para conservar
-                la forma redondeada del logo; imprime nítido en B/N. */}
-            <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1.2 }}>
-              <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
-              <p style={{ fontSize: '22px', fontWeight: 600, margin: '0'}}>baratera</p>
-              <p style={{ fontSize: '19px', fontWeight: 600, margin: 0 }}>papelería</p>
+            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+              <p style={{ fontWeight: 'bold', fontSize: '13px' }}>LA MAS BARATERA</p>
+              <p style={{ fontSize: '11px' }}>P A P E L E R I A</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
