@@ -378,7 +378,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '8px' }}>CEL. +52 {negocio.telefono}</p>
 
             {/* Título */}
-            <p style={{ textAlign: 'center', fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '8px' }}>
+            <p style={{ textAlign: 'center', fontSize: '14px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '8px' }}>
               NOTA DE VENTA
             </p>
 
@@ -386,7 +386,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             {numeroTicket && (
               <Row style={{ marginBottom: '2px' }}>
                 <span>Nota no.:</span>
-                <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>{numeroTicket}</span>
+                <span style={{ fontWeight: 'bold', letterSpacing: '0.3px' }}>{numeroTicket}</span>
               </Row>
             )}
             <Row style={{ marginBottom: '2px' }}>
@@ -395,7 +395,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             </Row>
             {clienteNombre && (
               <Row style={{ marginBottom: '2px' }}>
-                <span style={{ whiteSpace: 'nowrap', paddingRight: '6px' }}>
+                <span style={{ whiteSpace: 'nowrap', paddingRight: '5px' }}>
                   Cliente {clienteNumero ?? ''}
                 </span>
                 <span style={{ fontWeight: 'bold', textAlign: 'right' }}>{clienteNombre.toUpperCase()}</span>
@@ -411,7 +411,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             <Divider />
 
             {/* Encabezado de columnas */}
-            <Row style={{ fontSize: '10px', fontWeight: 'bold' }}>
+            <Row style={{ fontSize: '9px', fontWeight: 'bold' }}>
               <span>Cant. · Descripción</span>
               <span>Importe</span>
             </Row>
@@ -446,7 +446,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
                 <span style={{ whiteSpace: 'nowrap' }}>−{formatMXN(payment.descuento)}</span>
               </Row>
             )}
-            <Row style={{ fontSize: '16px', fontWeight: 'bold' }}>
+            <Row style={{ fontSize: '13px', fontWeight: 'bold' }}>
               <span>TOTAL</span>
               <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
             </Row>
@@ -484,16 +484,16 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             )}
 
             {/* Total en letras */}
-            <p style={{ textAlign: 'center', fontSize: '11px', marginTop: '8px' }}>
+            <p style={{ textAlign: 'center', fontSize: '10px', marginTop: '8px' }}>
               {montoALetras(total)}
             </p>
 
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold', marginBottom: '6px' }}>{negocio.footer1}</p>
-            <p style={{ textAlign: 'center', fontSize: '10px', lineHeight: 1.4 }}>{negocio.footer3}</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', marginBottom: '6px' }}>{negocio.footer1}</p>
+            <p style={{ textAlign: 'center', fontSize: '9px', lineHeight: 1.4 }}>{negocio.footer3}</p>
 
             {/* Pie: fecha/hora + cajero */}
-            <Row style={{ fontSize: '10px', marginTop: '10px' }}>
+            <Row style={{ fontSize: '9px', marginTop: '9px' }}>
               <span>{fecha ?? hora}</span>
               {cajero ? <span>{cajero}</span> : null}
             </Row>
