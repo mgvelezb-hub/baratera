@@ -64,7 +64,7 @@ const PAPER_PX  = Math.round(PAPER_MM / MM_PER_PX) // ≈ 219 px
 const PRINT_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: ${PAPER_MM}mm; }
+  html, body { width: ${PAPER_MM}mm; height: auto !important; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
