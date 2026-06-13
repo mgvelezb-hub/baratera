@@ -7,14 +7,16 @@ export default async function ConfiguracionesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Solo el developer puede acceder — verificación server-side sobre app_metadata
-  if (!user || (user.app_metadata as Record<string, string> | null)?.role !== 'developer') {
+  // developer → acceso total. admin → solo módulo Usuarios (cambiar nombre).
+  // Verificación server-side sobre app_metadata.
+  const rol = (user?.app_metadata as Record<string, string> | null)?.role ?? null
+  if (!user || (rol !== 'developer' && rol !== 'admin')) {
     redirect('/inventario')
   }
 
   return (
     <AppShell>
-      <ConfiguracionesClient />
+      <ConfiguracionesClient isDeveloper={rol === 'developer'} />
     </AppShell>
   )
 }

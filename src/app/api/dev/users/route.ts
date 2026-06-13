@@ -3,15 +3,19 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logAudit } from '@/lib/audit'
 
-async function verifyDeveloper() {
+// Devuelve el usuario logueado junto con su rol (o null si no hay sesión).
+async function getCaller() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.app_metadata?.role !== 'developer') return null
-  return user
+  if (!user) return null
+  const rol = (user.app_metadata as Record<string, string> | null)?.role ?? null
+  return { user, rol }
 }
 
 export async function GET() {
-  if (!await verifyDeveloper()) {
+  // Listar usuarios: developer (gestión total) o admin (asignar nombres)
+  const caller = await getCaller()
+  if (!caller || (caller.rol !== 'developer' && caller.rol !== 'admin')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -37,7 +41,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const caller = await verifyDeveloper()
+  const caller = await getCaller()
   if (!caller) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -47,15 +51,23 @@ export async function PATCH(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // ── Asignar nombre (user_metadata) ──────────────────────────────
+  // ── Asignar nombre (user_metadata) — developer o admin ──────────
   if (nombre !== undefined) {
+    if (caller.rol !== 'developer' && caller.rol !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const limpio = String(nombre).trim()
     const { error } = await admin.auth.admin.updateUserById(userId, {
       user_metadata: { nombre: limpio || null },
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await logAudit('usuario.nombre', { userId, nombre: limpio }, caller.email)
+    await logAudit('usuario.nombre', { userId, nombre: limpio }, caller.user.email)
     return NextResponse.json({ ok: true, userId, nombre: limpio })
+  }
+
+  // ── Cambiar rol — SOLO developer ────────────────────────────────
+  if (caller.rol !== 'developer') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Validar contra la tabla de roles dinámicos; fallback a la lista legacy
@@ -76,6 +88,6 @@ export async function PATCH(req: NextRequest) {
   const { error } = await admin.auth.admin.updateUserById(userId, { app_metadata: newMeta })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await logAudit('rol.cambiado', { userId, role }, caller.email)
+  await logAudit('rol.cambiado', { userId, role }, caller.user.email)
   return NextResponse.json({ ok: true, userId, role })
 }

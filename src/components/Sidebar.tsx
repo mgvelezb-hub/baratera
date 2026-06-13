@@ -29,7 +29,7 @@ const MODULES = [
 function NavContent({ onClose }: { onClose?: () => void }) {
   const pathname      = usePathname()
   const router        = useRouter()
-  const { can, isDeveloper } = useIsAdmin()
+  const { can, isDeveloper, role } = useIsAdmin()
 
   async function handleLogout() {
     await createClient().auth.signOut()
@@ -41,6 +41,8 @@ function NavContent({ onClose }: { onClose?: () => void }) {
     <>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {MODULES.filter(mod => {
+          // Configuraciones: developer (acceso total) o admin (solo Usuarios)
+          if (mod.id === 'configuraciones') return isDeveloper || role === 'admin'
           if (mod.devOnly) return isDeveloper
           return can(mod.permiso)
         }).map(mod => {

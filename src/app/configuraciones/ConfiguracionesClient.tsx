@@ -66,7 +66,7 @@ const TABLE_LABELS: Record<string, string> = {
 }
 
 // ── Main component ──────────────────────────────────────────────
-export default function ConfiguracionesClient() {
+export default function ConfiguracionesClient({ isDeveloper = true }: { isDeveloper?: boolean }) {
   const [tab,           setTab]           = useState<Tab>('usuarios')
   const [users,         setUsers]         = useState<UserInfo[]>([])
   const [stats,         setStats]         = useState<Stats | null>(null)
@@ -290,7 +290,10 @@ export default function ConfiguracionesClient() {
           { id: 'datos',     label: 'Datos',     Icon: Database           },
           { id: 'auditoria', label: 'Auditoría', Icon: ScrollText         },
           { id: 'sistema',   label: 'Sistema',   Icon: Monitor            },
-        ] as const).map(({ id, label, Icon }) => (
+        ] as const)
+          // Admin (no developer): solo el módulo de Usuarios
+          .filter(({ id }) => isDeveloper || id === 'usuarios')
+          .map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -370,23 +373,25 @@ export default function ConfiguracionesClient() {
                       </span>
                     )}
 
-                    {/* Role selector */}
-                    <div className="shrink-0">
-                      {roleLoading === u.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
-                      ) : (
-                        <select
-                          value={u.role ?? ''}
-                          onChange={e => changeRole(u.id, e.target.value)}
-                          className="h-8 pl-2 pr-7 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white cursor-pointer"
-                        >
-                          <option value="">Sin rol</option>
-                          {roles.map(r => (
-                            <option key={r.nombre} value={r.nombre}>{r.etiqueta}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
+                    {/* Role selector — solo developer puede cambiar roles */}
+                    {isDeveloper && (
+                      <div className="shrink-0">
+                        {roleLoading === u.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+                        ) : (
+                          <select
+                            value={u.role ?? ''}
+                            onChange={e => changeRole(u.id, e.target.value)}
+                            className="h-8 pl-2 pr-7 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white cursor-pointer"
+                          >
+                            <option value="">Sin rol</option>
+                            {roles.map(r => (
+                              <option key={r.nombre} value={r.nombre}>{r.etiqueta}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}

@@ -191,7 +191,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
 
 export default function TicketPrint({ items, total, payment, hora, fecha, cajero, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero, clienteTelefono }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
-  const [tab,          setTab]          = useState<Tab>(clienteTelefono ? 'compartir' : 'imprimir')
+  const [tab,          setTab]          = useState<Tab>(clienteTelefono ? 'compartir' : 'correo')
   const [email,        setEmail]        = useState('')
   const [emailSending, setEmailSending] = useState(false)
   const [emailSent,    setEmailSent]    = useState(false)
@@ -311,7 +311,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
     setPdfError('')
     setWaStatus('idle')
     setWaError('')
-    setTab('imprimir')
+    setTab('correo')
     setTimeout(() => setTab('compartir'), 0)
   }
 
@@ -342,8 +342,11 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // NOTA: la pestaña "Imprimir" está deshabilitada (la impresora no
+  // funciona aún). El código de impresión (openPrint, handlePrint,
+  // PRINT_CSS) se conserva intacto; para reactivar, vuelve a agregar
+  // { id: 'imprimir', label: 'Imprimir', Icon: Printer } aquí.
   const TABS = [
-    { id: 'imprimir',   label: 'Imprimir',   Icon: Printer },
     { id: 'correo',     label: 'Correo',     Icon: Mail    },
     { id: 'compartir',  label: 'WhatsApp',   Icon: Share2  },
   ] as const
@@ -504,7 +507,7 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
         <div className="border-t border-slate-100 p-4 space-y-3">
 
           {/* Tab selector */}
-          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
             {TABS.map(({ id, label, Icon }) => (
               <button
                 key={id}
