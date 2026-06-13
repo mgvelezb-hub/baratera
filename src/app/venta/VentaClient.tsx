@@ -29,6 +29,8 @@ interface VentaExitosa {
   items:             CartItem[]
   total:             number
   hora:              string
+  fecha:             string
+  cajero:            string | null
   payment:           PaymentData
   numeroTicket?:     string | null
   clienteNombre?:    string | null
@@ -98,13 +100,18 @@ function ahorroItem(item: CartItem): number {
 function toTicketItems(items: CartItem[]): TicketItem[] {
   return items.map(item => {
     const { caja, mayoreo } = ahorroDesglose(item)
+    const subtotal = subtotalItem(item)
+    const cantidad = piezasReales(item)
     return {
       nombre:         item.producto.nombre,
       cantidadCajas:  item.cantidadCajas,
       cantidadPiezas: item.cantidadPiezas,
       unidad:         item.producto.unidad,
-      subtotal:       subtotalItem(item),
+      subtotal,
       colorNombre:    item.colorNombre ?? null,
+      sku:            item.producto.sku ?? null,
+      cantidad,
+      precioUnitario: cantidad > 0 ? subtotal / cantidad : subtotal,
       ahorro:         caja + mayoreo,
       ahorroCaja:     caja,
       ahorroMayoreo:  mayoreo,
@@ -1181,7 +1188,15 @@ export default function VentaClient() {
     }
 
     const ventaTotal = totalCarrito(carrito)
-    const hora       = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+    const ahora      = new Date()
+    const hora       = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+    const dd         = String(ahora.getDate()).padStart(2, '0')
+    const mm         = String(ahora.getMonth() + 1).padStart(2, '0')
+    const yyyy       = ahora.getFullYear()
+    const hhmmss     = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    const fecha      = `${dd}/${mm}/${yyyy} ${hhmmss}`
+    // Nombre del cajero: prefijo del correo del usuario logueado
+    const cajero     = user?.email ? user.email.split('@')[0].replace(/[._-]/g, ' ').toUpperCase() : null
 
     // Auto-upgrade a frecuente: si el cliente normal acumula ≥5 compras en el mes
     if (clienteActual && clienteActual.tipo === 'normal') {
@@ -1239,6 +1254,8 @@ export default function VentaClient() {
       items:            [...carrito],
       total:            ventaTotal,
       hora,
+      fecha,
+      cajero,
       payment,
       numeroTicket,
       clienteNombre:    clienteActual?.nombre          ?? null,
@@ -1514,6 +1531,8 @@ export default function VentaClient() {
         total={ventaExitosa.total}
         payment={ventaExitosa.payment}
         hora={ventaExitosa.hora}
+        fecha={ventaExitosa.fecha}
+        cajero={ventaExitosa.cajero}
         onClose={resetDisplay}
         onNuevaVenta={resetDisplay}
         numeroTicket={ventaExitosa.numeroTicket}

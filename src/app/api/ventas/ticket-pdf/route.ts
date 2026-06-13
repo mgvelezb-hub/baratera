@@ -10,10 +10,14 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as TicketPDFInput
 
+  // Logo: URL absoluta al asset público (react-pdf la descarga al render).
+  const origin  = req.nextUrl.origin
+  const logoSrc = `${origin}/logo-baratera.png`
+
   let buffer: Buffer
   try {
     buffer = await renderToBuffer(
-      React.createElement(TicketPDF, body) as React.ReactElement<DocumentProps>
+      React.createElement(TicketPDF, { ...body, logoSrc }) as React.ReactElement<DocumentProps>
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error al renderizar PDF'

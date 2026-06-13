@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { Printer, Mail, X, Share2, Download, Loader2, Copy } from 'lucide-react'
-import { formatMXN, pluralUnidad } from '@/lib/utils'
+import { formatMXN, formatNum, pluralUnidad, montoALetras } from '@/lib/utils'
 import type { PaymentData } from './PaymentModal'
 import { useConfig } from '@/lib/hooks/useConfig'
 
@@ -13,6 +13,9 @@ export interface TicketItem {
   unidad:          string
   subtotal:        number
   colorNombre?:    string | null
+  sku?:            string | null
+  cantidad?:       number
+  precioUnitario?: number
   ahorro?:         number
   ahorroCaja?:     number
   ahorroMayoreo?:  number
@@ -23,6 +26,8 @@ interface Props {
   total:             number
   payment:           PaymentData
   hora:              string
+  fecha?:            string | null
+  cajero?:           string | null
   onClose:           () => void
   onNuevaVenta:      () => void
   numeroTicket?:     string | null
@@ -153,6 +158,19 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
     // Paso 2: esperar fuentes. Si falla (fuente de sistema), seguimos.
     try { await doc.fonts.ready } catch { /* ok */ }
 
+    // Paso 2b: esperar a que TODAS las imágenes (logo) terminen de
+    // cargar. Si medimos antes, el alto sale mal y el logo no imprime.
+    await Promise.all(
+      Array.from(doc.images).map(img =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>(resolve => {
+              img.onload  = () => resolve()
+              img.onerror = () => resolve()
+            })
+      )
+    )
+
     // Paso 3: medir. El body ya mide 58mm de ancho por el CSS,
     // así que scrollHeight es la altura REAL que tendrá en papel.
     const contentPx = doc.body.scrollHeight
@@ -175,7 +193,7 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   }
 }
 
-export default function TicketPrint({ items, total, payment, hora, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero, clienteTelefono }: Props) {
+export default function TicketPrint({ items, total, payment, hora, fecha, cajero, onClose, onNuevaVenta, numeroTicket, clienteNombre, clienteNumero, clienteTelefono }: Props) {
   const ticketRef = useRef<HTMLDivElement>(null)
   const [tab,          setTab]          = useState<Tab>(clienteTelefono ? 'compartir' : 'imprimir')
   const [email,        setEmail]        = useState('')
@@ -197,6 +215,12 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     : payment.metodo === 'transferencia' ? 'Transferencia SPEI'
     : 'Efectivo + Tarjeta'
 
+  // URL absoluta del logo — necesaria para que el <img> cargue dentro
+  // del iframe de impresión (un path relativo no resuelve ahí).
+  const logoUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/logo-baratera.png`
+    : '/logo-baratera.png'
+
   function handlePrint(): void {
     const node = ticketRef.current
     if (!node) return
@@ -217,10 +241,19 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
           items,
           total,
           hora,
-          metodo:        payment.metodo,
-          montoEfectivo: payment.montoEfectivo,
-          montoTarjeta:  payment.montoTarjeta,
-          cambio:        payment.cambio,
+          fecha,
+          cajero,
+          numeroTicket,
+          clienteNombre,
+          clienteNumero,
+          metodo:             payment.metodo,
+          montoEfectivo:      payment.montoEfectivo,
+          montoTarjeta:       payment.montoTarjeta,
+          montoTransferencia: payment.montoTransferencia,
+          cambio:             payment.cambio,
+          cuponPct:           payment.cuponPct,
+          descuento:          payment.descuento,
+          negocio,
         }),
       })
       const data = await res.json()
@@ -247,7 +280,7 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
     fetch('/api/ventas/ticket-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ items, total, payment, hora, numeroTicket, clienteNombre, clienteNumero, negocio }),
+      body:    JSON.stringify({ items, total, payment, hora, fecha, cajero, numeroTicket, clienteNombre, clienteNumero, negocio }),
     })
       .then(async res => {
         const data = await res.json()
@@ -343,60 +376,74 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* Logo tipográfico */}
-            <div style={{ marginBottom: '8px' }}>
-              <div style={{ background: '#000', height: '2px' }} />
-              <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                <p style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '4px', margin: '0 0 3px' }}>PAPELERÍA</p>
-                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.1, margin: 0 }}>LA MÁS</p>
-                <p style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', lineHeight: 1.1, margin: 0 }}>BARATERA</p>
-              </div>
-              <div style={{ background: '#000', height: '2px' }} />
-            </div>
-            <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '5px' }}>
+            {/* Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoUrl}
+              alt="La Más Baratera"
+              style={{ display: 'block', width: '70%', maxWidth: '170px', margin: '0 auto 8px', borderRadius: '8px' }}
+            />
+            <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
               {negocio.direccion2}
             </p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '4px' }}>{negocio.web}</p>
-            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '7px' }}>{negocio.telefono}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '3px' }}>{negocio.web}</p>
+            <p style={{ textAlign: 'center', fontSize: '11px', marginBottom: '8px' }}>CEL. +52 {negocio.telefono}</p>
 
-            {/* Hora + Número de ticket en la misma línea */}
-            {numeroTicket ? (
-              <Row style={{ marginBottom: '4px' }}>
-                <span style={{ fontSize: '11px' }}>{hora}</span>
-                <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px' }}>#{numeroTicket}</span>
+            {/* Título */}
+            <p style={{ textAlign: 'center', fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '8px' }}>
+              NOTA DE VENTA
+            </p>
+
+            {/* Datos de la nota */}
+            {numeroTicket && (
+              <Row style={{ marginBottom: '2px' }}>
+                <span>Nota no.:</span>
+                <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>{numeroTicket}</span>
               </Row>
-            ) : (
-              <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '4px' }}>{hora}</p>
             )}
-
-            {/* Cliente */}
+            <Row style={{ marginBottom: '2px' }}>
+              <span>Fecha:</span>
+              <span>{fecha ?? hora}</span>
+            </Row>
             {clienteNombre && (
-              <p style={{ fontSize: '11px', marginBottom: '3px' }}>
-                {clienteNumero
-                  ? <><span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{clienteNumero}</span>{' — '}</>
-                  : null
-                }
-                {clienteNombre}
-              </p>
+              <Row style={{ marginBottom: '2px' }}>
+                <span style={{ whiteSpace: 'nowrap', paddingRight: '6px' }}>
+                  Cliente {clienteNumero ?? ''}
+                </span>
+                <span style={{ fontWeight: 'bold', textAlign: 'right' }}>{clienteNombre.toUpperCase()}</span>
+              </Row>
+            )}
+            {cajero && (
+              <Row style={{ marginBottom: '2px' }}>
+                <span>Atendido por:</span>
+                <span>{cajero}</span>
+              </Row>
             )}
 
             <Divider />
 
+            {/* Encabezado de columnas */}
+            <Row style={{ fontSize: '10px', fontWeight: 'bold' }}>
+              <span>Cant. · Descripción</span>
+              <span>Importe</span>
+            </Row>
+
             {/* Items */}
             {items.map((item, i) => {
-              const parts: string[] = []
-              if (item.cantidadCajas  > 0) parts.push(`${item.cantidadCajas} ${pluralUnidad('caja', item.cantidadCajas)}`)
-              if (item.cantidadPiezas > 0) {
-                const uPzas = (item.cantidadCajas > 0 || item.unidad === 'caja') ? 'pza' : item.unidad
-                parts.push(`${item.cantidadPiezas} ${pluralUnidad(uPzas, item.cantidadPiezas)}`)
-              }
-              const descripcion = [parts.join(' + '), item.colorNombre].filter(Boolean).join(' / ')
+              const cantidad = item.cantidad ?? (item.cantidadCajas * 0 + item.cantidadPiezas)
+              const uPieza   = item.unidad === 'caja' ? 'pza' : item.unidad
+              const cantTxt  = `${formatNum(cantidad)} ${pluralUnidad(uPieza, cantidad)}`
+              const precioU  = item.precioUnitario ?? (cantidad > 0 ? item.subtotal / cantidad : item.subtotal)
+              const nombre   = [item.nombre, item.colorNombre].filter(Boolean).join(' / ')
               return (
-                <div key={i} style={{ marginBottom: '7px' }}>
-                  <p style={{ fontWeight: 'bold' }}>{item.nombre}</p>
+                <div key={i} style={{ marginTop: '6px' }}>
+                  <p style={{ fontWeight: 'bold' }}>
+                    {item.sku ? <span style={{ fontWeight: 'normal' }}>[{item.sku}] </span> : null}
+                    {nombre}
+                  </p>
                   <Row>
-                    <span>{descripcion}</span>
+                    <span>{cantTxt} × {formatMXN(precioU)}</span>
                     <span style={{ whiteSpace: 'nowrap', paddingLeft: '6px' }}>{formatMXN(item.subtotal)}</span>
                   </Row>
                 </div>
@@ -417,42 +464,52 @@ export default function TicketPrint({ items, total, payment, hora, onClose, onNu
               <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(total)}</span>
             </Row>
 
-            <Divider />
-
             {/* Desglose de pago */}
-            <Row>
-              <span>Pago</span>
-              <span style={{ whiteSpace: 'nowrap' }}>{metodoLabel}</span>
-            </Row>
             {payment.montoEfectivo > 0 && (
-              <Row>
+              <Row style={{ marginTop: '4px' }}>
                 <span>Efectivo</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoEfectivo)}</span>
               </Row>
             )}
             {payment.montoTarjeta > 0 && (
-              <Row>
+              <Row style={{ marginTop: '4px' }}>
                 <span>Tarjeta</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTarjeta)}</span>
               </Row>
             )}
             {payment.montoTransferencia > 0 && (
-              <Row>
+              <Row style={{ marginTop: '4px' }}>
                 <span>Transferencia</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.montoTransferencia)}</span>
               </Row>
             )}
+            {payment.montoEfectivo === 0 && payment.montoTarjeta === 0 && payment.montoTransferencia === 0 && (
+              <Row style={{ marginTop: '4px' }}>
+                <span>Pago</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{metodoLabel}</span>
+              </Row>
+            )}
             {payment.cambio > 0 && (
-              <Row style={{ fontWeight: 'bold' }}>
+              <Row style={{ fontWeight: 'bold', marginTop: '4px' }}>
                 <span>Cambio</span>
                 <span style={{ whiteSpace: 'nowrap' }}>{formatMXN(payment.cambio)}</span>
               </Row>
             )}
-            
+
+            {/* Total en letras */}
+            <p style={{ textAlign: 'center', fontSize: '11px', marginTop: '8px' }}>
+              {montoALetras(total)}
+            </p>
+
             <Divider />
-            <p style={{ textAlign: 'center', fontSize: '11px', marginTop: '10px' }}>{negocio.footer1}</p>
-            <p style={{ textAlign: 'center', fontSize: '11px' }}>{negocio.footer2}</p>
-            <p style={{ textAlign: 'center', fontSize: '10px', marginTop: '10px' }}>{negocio.footer3}</p>
+            <p style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold', marginBottom: '6px' }}>{negocio.footer1}</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', lineHeight: 1.4 }}>{negocio.footer3}</p>
+
+            {/* Pie: fecha/hora + cajero */}
+            <Row style={{ fontSize: '10px', marginTop: '10px' }}>
+              <span>{fecha ?? hora}</span>
+              {cajero ? <span>{cajero}</span> : null}
+            </Row>
           </div>
         </div>
 

@@ -71,3 +71,54 @@ export function formatFechaCorta(dateStr: string): string {
     minute: '2-digit',
   }).format(new Date(dateStr))
 }
+
+// ── Número a letras (español MX) — para el total escrito del ticket.
+//    Soporta hasta cientos de millones. Devuelve solo el entero en
+//    mayúsculas; el formato "PESOS XX/100 M.N." lo arma montoALetras.
+const NAL_UNIDADES = [
+  '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
+  'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE',
+  'DIECIOCHO', 'DIECINUEVE', 'VEINTE', 'VEINTIUNO', 'VEINTIDÓS', 'VEINTITRÉS',
+  'VEINTICUATRO', 'VEINTICINCO', 'VEINTISÉIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE',
+]
+const NAL_DECENAS  = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
+const NAL_CENTENAS = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
+
+function nalSeccion(num: number): string {
+  if (num === 100) return 'CIEN'
+  let s = ''
+  const c     = Math.floor(num / 100)
+  const resto = num % 100
+  if (c > 0) s += NAL_CENTENAS[c] + ' '
+  if (resto < 30) {
+    s += NAL_UNIDADES[resto]
+  } else {
+    const d = Math.floor(resto / 10)
+    const u = resto % 10
+    s += NAL_DECENAS[d]
+    if (u > 0) s += ' Y ' + NAL_UNIDADES[u]
+  }
+  return s.trim()
+}
+
+function enteroALetras(n: number): string {
+  if (n === 0) return 'CERO'
+  const millones = Math.floor(n / 1_000_000)
+  const miles    = Math.floor((n % 1_000_000) / 1000)
+  const resto    = n % 1000
+  let r = ''
+  if (millones > 0) r += (millones === 1 ? 'UN MILLÓN' : nalSeccion(millones) + ' MILLONES') + ' '
+  if (miles > 0)    r += (miles === 1 ? 'MIL' : nalSeccion(miles) + ' MIL') + ' '
+  if (resto > 0)    r += nalSeccion(resto)
+  // Apócope: "uno" → "un" antes de sustantivo masculino (MIL/MILLONES/PESOS)
+  return r.trim().replace(/\bVEINTIUNO\b/g, 'VEINTIÚN').replace(/\bUNO\b/g, 'UN')
+}
+
+// "DIECIOCHO MIL OCHOCIENTOS PESOS 00/100 M.N."
+export function montoALetras(monto: number): string {
+  const entero   = Math.floor(monto)
+  const centavos = Math.round((monto - entero) * 100)
+  const pesoLbl  = entero === 1 ? 'PESO' : 'PESOS'
+  const cent     = String(centavos).padStart(2, '0')
+  return `${enteroALetras(entero)} ${pesoLbl} ${cent}/100 M.N.`
+}
