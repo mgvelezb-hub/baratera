@@ -62,6 +62,7 @@ const PAPER_PX  = Math.round(PAPER_MM / MM_PER_PX) // ≈ 219 px
 // El @page (tamaño de hoja) se inyecta dinámicamente en openPrint
 // con el alto exacto del contenido ya medido.
 const PRINT_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: ${PAPER_MM}mm; }
   body {
@@ -155,7 +156,16 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
   setTimeout(cleanup, 60_000)
 
   const go = async () => {
-    // Paso 2: esperar fuentes. Si falla (fuente de sistema), seguimos.
+    // Paso 2: esperar fuentes. Forzamos la carga de Fredoka (el wordmark
+    // del logo) antes de medir; si no, fonts.ready puede resolver antes
+    // de que la fuente se solicite y el logo imprimiría con el fallback.
+    try {
+      await Promise.all([
+        doc.fonts.load('700 34px "Fredoka"'),
+        doc.fonts.load('600 22px "Fredoka"'),
+        doc.fonts.load('500 18px "Fredoka"'),
+      ])
+    } catch { /* ok */ }
     try { await doc.fonts.ready } catch { /* ok */ }
 
     // Paso 2b: esperar a que TODAS las imágenes (logo) terminen de
@@ -370,15 +380,13 @@ export default function TicketPrint({ items, total, payment, hora, fecha, cajero
             ref={ticketRef}
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '15px', lineHeight: 1.4, color: '#000', width: '100%' }}
           >
-            {/* Logo tipográfico — sin color, para que imprima nítido en B/N */}
-            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-              <div style={{ background: '#000', height: '2px' }} />
-              <div style={{ padding: '7px 0' }}>
-                <p style={{ fontSize: '12px', fontWeight: 'bold', lineHeight: 1.1, margin: 0, letterSpacing: '1px' }}>LA MÁS</p>
-                <p style={{ fontSize: '22px', fontWeight: 'bold', lineHeight: 1, margin: '1px 0', letterSpacing: '0.5px' }}>BARATERA</p>
-                <p style={{ fontSize: '14px', fontWeight: 'bold', lineHeight: 1.1, margin: 0, letterSpacing: '3px' }}>PAPELERÍA</p>
-              </div>
-              <div style={{ background: '#000', height: '2px' }} />
+            {/* Wordmark redondeado del logo — negro, sin color ni fondo.
+                Usa la tipografía Fredoka (cargada vía @import) para conservar
+                la forma redondeada del logo; imprime nítido en B/N. */}
+            <div style={{ textAlign: 'center', marginBottom: '10px', fontFamily: "'Fredoka', 'Segoe UI', sans-serif", color: '#000', lineHeight: 1 }}>
+              <p style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>la más</p>
+              <p style={{ fontSize: '34px', fontWeight: 700, margin: '-1px 0', letterSpacing: '-0.5px' }}>baratera</p>
+              <p style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>papelería</p>
             </div>
             <p style={{ textAlign: 'center', fontSize: '11px', lineHeight: 1.45, marginBottom: '3px' }}>
               {negocio.direccion1}<br />
