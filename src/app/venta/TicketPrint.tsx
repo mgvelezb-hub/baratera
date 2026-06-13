@@ -182,9 +182,8 @@ function openPrint(bodyHtml: string, css = PRINT_CSS): void {
       )
     )
 
-    // Paso 3: medir el contenido real via wrapper (body se expande al viewport del iframe).
-    const contentEl = doc.getElementById('ticket-root') as HTMLElement | null
-    const contentPx = contentEl ? contentEl.offsetHeight : doc.body.scrollHeight
+    // Paso 3: medir el contenido real via wrapper (body se expande al viewport del iframe)
+    const contentPx = doc.body.scrollHeight
     const heightMm  = Math.ceil(contentPx * MM_PER_PX) + BUFFER_MM
 
     // Paso 4: definir la "hoja" del tamaño exacto del ticket.
