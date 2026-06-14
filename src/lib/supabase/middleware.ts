@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
@@ -39,7 +40,15 @@ export async function updateSession(request: NextRequest) {
     if (rol !== 'developer') {
       let bloqueado = false
       try {
-        const { data } = await supabase
+        // Leemos la bandera con el service role: el RLS de `configuracion`
+        // oculta la fila a los usuarios normales, así que con la sesión del
+        // propio usuario la consulta volvía vacía y el bloqueo no aplicaba.
+        const admin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { persistSession: false, autoRefreshToken: false } },
+        )
+        const { data } = await admin
           .from('configuracion')
           .select('valor')
           .eq('clave', 'lockdown')
