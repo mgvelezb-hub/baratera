@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Package, Loader2 } from 'lucide-react'
+import { Package, Loader2, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -11,6 +11,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [bloqueado, setBloqueado] = useState(false)
+
+  // Aviso cuando el middleware redirige por bloqueo de plataforma (?bloqueado=1)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBloqueado(new URLSearchParams(window.location.search).get('bloqueado') === '1')
+    }
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -48,6 +56,13 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <h1 className="text-lg font-semibold text-slate-900 mb-1">Iniciar sesión</h1>
           <p className="text-sm text-slate-500 mb-5">Control de inventario</p>
+
+          {bloqueado && (
+            <div className="mb-5 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Plataforma en mantenimiento. El acceso está restringido temporalmente; solo el administrador del sistema puede entrar.</span>
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Users, Database, Monitor, RefreshCw,
   Trash2, AlertTriangle, CheckCircle2, Loader2, Shield,
-  Activity, Server, KeyRound, SlidersHorizontal, ScrollText, Download, Sprout, UploadCloud,
+  Activity, Server, KeyRound, SlidersHorizontal, ScrollText, Download, Sprout, UploadCloud, Lock,
 } from 'lucide-react'
 import RolesTab, { type RoleRow } from './RolesTab'
 import AjustesTab from './AjustesTab'
@@ -76,6 +76,9 @@ export default function ConfiguracionesClient({ isDeveloper = true }: { isDevelo
   const [nameLoading,   setNameLoading]   = useState<string | null>(null)
   const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null)
   const [simRole,       setSimRole]       = useState('')
+  const [lockdown,        setLockdown]        = useState<{ activo: boolean; por: string | null; desde: string | null }>({ activo: false, por: null, desde: null })
+  const [lockdownLoading, setLockdownLoading] = useState(false)
+  const [lockdownConfirm, setLockdownConfirm] = useState(false)
 
   const [resetModal,    setResetModal]    = useState<{ key: string; label: string } | null>(null)
   const [resetInput,    setResetInput]    = useState('')
@@ -162,7 +165,30 @@ export default function ConfiguracionesClient({ isDeveloper = true }: { isDevelo
     setLoadingStats(false)
   }, [])
 
-  useEffect(() => { if (tab === 'sistema') fetchStats() }, [tab, fetchStats])
+  // ── Bloqueo de plataforma ─────────────────────────────────────
+  const fetchLockdown = useCallback(async () => {
+    const res = await fetch('/api/dev/lockdown')
+    if (res.ok) setLockdown(await res.json())
+  }, [])
+
+  useEffect(() => { if (tab === 'sistema') { fetchStats(); fetchLockdown() } }, [tab, fetchStats, fetchLockdown])
+
+  async function toggleLockdown(activo: boolean) {
+    setLockdownLoading(true)
+    setLockdownConfirm(false)
+    const res = await fetch('/api/dev/lockdown', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ activo }),
+    })
+    if (res.ok) {
+      await fetchLockdown()
+      showToast(activo ? 'Plataforma bloqueada — solo tú puedes entrar' : 'Plataforma desbloqueada', true)
+    } else {
+      showToast((await res.json()).error ?? 'Error al cambiar el bloqueo', false)
+    }
+    setLockdownLoading(false)
+  }
 
   // ── Change role ───────────────────────────────────────────────
   async function changeRole(userId: string, role: string | null) {
@@ -614,6 +640,69 @@ export default function ConfiguracionesClient({ isDeveloper = true }: { isDevelo
       {/* ── TAB SISTEMA ──────────────────────────────────────────── */}
       {tab === 'sistema' && (
         <div className="space-y-6">
+
+          {/* Bloqueo de plataforma */}
+          <div className={`rounded-xl border p-4 ${lockdown.activo ? 'bg-red-50 border-red-300' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Lock className={`w-4 h-4 ${lockdown.activo ? 'text-red-600' : 'text-violet-500'}`} />
+                  Bloqueo de plataforma
+                </p>
+                <p className="text-xs text-slate-500 mt-1 max-w-md">
+                  Cierra la sesión de todos los usuarios y deja la plataforma accesible
+                  solo para tu cuenta de developer. Útil para mantenimiento.
+                </p>
+                {lockdown.activo && lockdown.desde && (
+                  <p className="text-xs text-red-600 mt-1.5 font-medium">
+                    Activo desde {new Date(lockdown.desde).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
+                    {lockdown.por ? ` · por ${lockdown.por}` : ''}
+                  </p>
+                )}
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${lockdown.activo ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                {lockdown.activo ? 'BLOQUEADA' : 'Activa'}
+              </span>
+            </div>
+
+            <div className="mt-3">
+              {lockdown.activo ? (
+                <button
+                  onClick={() => toggleLockdown(false)}
+                  disabled={lockdownLoading}
+                  className="h-10 px-4 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                >
+                  {lockdownLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : '🔓'}
+                  Desbloquear plataforma
+                </button>
+              ) : lockdownConfirm ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleLockdown(true)}
+                    disabled={lockdownLoading}
+                    className="h-10 px-4 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                  >
+                    {lockdownLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Sí, bloquear y sacar a todos
+                  </button>
+                  <button
+                    onClick={() => setLockdownConfirm(false)}
+                    className="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setLockdownConfirm(true)}
+                  className="h-10 px-4 rounded-xl bg-slate-900 hover:bg-black text-white text-sm font-semibold transition-colors flex items-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  Bloquear plataforma
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Stats */}
           <div>
